@@ -11,10 +11,10 @@ How the plan is kept:
 
 | Field | Value |
 | --- | --- |
-| Current phase | Phase 0 — Foundations |
-| Last updated | 2026-10-10 |
-| Next task | 0.9 First push: make the repository public and confirm CI is green |
-| Blocked on | Nothing |
+| Current phase | Phase 0 — Foundations: complete |
+| Last updated | 2026-10-11 |
+| Next task | Phase 1, task 1.1 `contract`, once the maintainer starts Phase 1 |
+| Blocked on | The maintainer's go-ahead for Phase 1 |
 | Latest release | None |
 | Planned releases | v0.1 Check, v0.2 Keep, v0.3 Publish, v0.4 Rings |
 | Design partners | None yet (target: 1 by the end of Phase 1) |
@@ -573,7 +573,7 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
 
   Target: 1–2 teams that reload data live. Both stay drafts until the maintainer publishes them.
 - [x] 0.8 Write `docs/architecture.md` from §3.1 and §3.5–3.6.
-- [ ] 0.9 First push: the maintainer makes the GitHub repo public and pushes the signed-off commits (§7). Then confirm CI is green.
+- [x] 0.9 First push: the maintainer makes the GitHub repo public and pushes the signed-off commits (§7). Then confirm CI is green.
 
 **Acceptance criteria:**
 - `just check` passes.
