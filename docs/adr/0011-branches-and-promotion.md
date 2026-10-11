@@ -1,6 +1,6 @@
 # ADR-0011: Branches and promotion
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-11
 
 ## Context
