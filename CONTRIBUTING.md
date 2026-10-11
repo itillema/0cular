@@ -9,6 +9,19 @@ Thanks for your interest. 0cular is pre-alpha and has one maintainer, so issues 
 - Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 - To report a vulnerability, follow [SECURITY.md](SECURITY.md) instead of opening an issue.
 
+## Branches
+
+0cular has four permanent branches, one per environment:
+
+| Branch | Environment |
+| --- | --- |
+| `main` | Production |
+| `uat` | UAT and staging |
+| `qa` | QA and testing |
+| `dev` | Development |
+
+Branch off `dev`, and open your pull request against `dev`. The maintainer then promotes changes `dev` → `qa` → `uat` → `main`, and urgent fixes go from a `hotfix/*` branch into `uat`. A check called `branch-flow` rejects pull requests that skip a step. [ADR-0011](docs/adr/0011-branches-and-promotion.md) has the full rules.
+
 ## Development setup
 
 You need:

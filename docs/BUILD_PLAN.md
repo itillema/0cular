@@ -606,7 +606,7 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
   - `docs/contract-spec.md`, with the decode model;
   - a gate and Action guide;
   - a cookbook of common invariants (non-null, caps, `zerocular.unique`, referential checks).
-- [ ] 1.9 Release v0.1.0 through one release workflow: release-please runs first, and GoReleaser runs only when `release_created` is true (§4). It builds binaries (linux, darwin, windows × amd64, arm64), cosign keyless signatures, SLSA provenance, a syft SBOM and a GHCR image. Then switch the Action to the verified release binary.
+- [ ] 1.9 Release v0.1.0 through one release workflow: release-please runs first, and GoReleaser runs only when `release_created` is true (§4). It builds binaries (linux, darwin, windows × amd64, arm64), cosign keyless signatures, SLSA provenance, a syft SBOM and a GHCR image. Then switch the Action to the verified release binary. First decide how releases fit the branch flow (ADR-0011, §10).
 
 **Acceptance criteria** (initial targets; calibrate in ADRs):
 - **Replay:** 3 of 3 v0.1 scenarios BLOCK with evidence that names the violated rule.
@@ -747,6 +747,7 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
 - **Versioning:** SemVer, with 0.x until contract spec v1. Contract `apiVersion` changes follow a written deprecation policy.
 - **Releases:** release-please (Go release type), driven by Conventional Commits, and GoReleaser run in one workflow; the GoReleaser job runs only when `release_created` is true (§4). It produces binaries, a GHCR image, checksums, cosign keyless signatures, SLSA provenance and a syft SBOM. The Homebrew tap is optional.
 - **Sign-off (DCO, ADR-0010):** every commit is signed off with `git commit -s`, and a DCO check runs in CI on every pull request.
+- **Branches and environments (ADR-0011):** `main` (production), `uat`, `qa` and `dev` are permanent. Work branches off `dev` and is promoted `dev` → `qa` → `uat` → `main`; a `hotfix/*` branch goes into `uat`. The `branch-flow` check enforces the order, and rulesets keep the four branches from being deleted or force-pushed.
 - **Repo hygiene:** branch protection with required checks, Dependabot and a Scorecard badge.
 - **Docs:**
   - README: pitch, the replay-suite story, a 10-minute quickstart;
@@ -826,6 +827,7 @@ ADRs 0001–0010 are reserved for the decisions below, and each is written in th
 - **Second v0.3 adapter.** Consul or etcd? Let design partners decide.
 - **Marketplace listing.** The Action stays unlisted in `action/` for v0.1. Should a later release add a root `action.yml`, or a separate action repo, to get a listing?
 - **SLSA provenance.** Keep slsa-github-generator as the one tag-pinned exception (§4), or produce provenance with a tool that can be pinned by SHA? Decide in task 1.9.
+- **Releases and the branch flow.** release-please opens its release pull request against `main`, which accepts only `uat` (ADR-0011). Run release-please against `uat`, or tag releases on `main` after a promotion? Decide in task 1.9.
 - **Git as a store.** Is a git store worth supporting, given GitOps users already have the Action?
 - **Docs site tooling**, before v0.4.
 

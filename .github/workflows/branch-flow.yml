@@ -1,0 +1,50 @@
+# Enforces the promotion flow from ADR-0011: main accepts only uat; uat accepts
+# qa or a hotfix/* branch; qa accepts dev or a dev/* branch; dev accepts
+# anything. Promotions into main, uat and qa must come from this repository.
+name: branch-flow
+
+on:
+  pull_request:
+    # "edited" runs the check again when a pull request's base branch changes.
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-flow:
+    name: branch-flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Check that the pull request follows the branch flow
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          case "$BASE" in
+            main) accepted="uat" ;;
+            uat) accepted="qa or a hotfix/* branch" ;;
+            qa) accepted="dev or a dev/* branch" ;;
+            *)
+              echo "Pull requests into $BASE aren't restricted."
+              exit 0
+              ;;
+          esac
+          ok=false
+          if [ "$HEAD_REPO" = "$REPO" ]; then
+            case "$BASE:$HEAD" in
+              main:uat | uat:qa | uat:hotfix/* | qa:dev | qa:dev/*) ok=true ;;
+            esac
+          fi
+          if [ "$ok" != true ]; then
+            echo "::error::Pull requests into $BASE must come from $accepted in this repository, not $HEAD_REPO:$HEAD. See CONTRIBUTING.md."
+            exit 1
+          fi
+          echo "$HEAD may merge into $BASE."
