@@ -5,6 +5,8 @@ name: scorecard
 
 on:
   branch_protection_rule:
+  # Run on demand, for example after changing repository settings.
+  workflow_dispatch:
   schedule:
     - cron: "17 6 * * 1"
   push:
