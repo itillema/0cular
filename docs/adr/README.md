@@ -23,3 +23,4 @@ This directory records the decisions that shape 0cular: what was decided, why, a
 | 0008 | Health evaluation | Planned (task 4.3) |
 | 0009 | Re-validating a cached LKG when the contract changes | Planned (task 2.1) |
 | [0010](0010-license-and-dco.md) | License (Apache-2.0) and DCO | Accepted |
+| [0011](0011-branches-and-promotion.md) | Branches and promotion | Proposed |

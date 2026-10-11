@@ -2,6 +2,8 @@ version: 2
 updates:
   - package-ecosystem: gomod
     directory: /
+    # Updates are promoted dev -> qa -> uat -> main like any other change (ADR-0011).
+    target-branch: dev
     schedule:
       interval: weekly
     # Let new releases settle for a week before proposing them.
@@ -15,6 +17,7 @@ updates:
 
   - package-ecosystem: github-actions
     directory: /
+    target-branch: dev
     schedule:
       interval: weekly
     cooldown:
