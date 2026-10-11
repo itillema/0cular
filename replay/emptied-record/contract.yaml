@@ -1,0 +1,15 @@
+apiVersion: 0cular/v1alpha1
+kind: Contract
+metadata:
+  name: kv-endpoint-record
+artifact:
+  format: json
+  maxBytes: 1MiB
+schema:
+  jsonSchema: schema.json
+invariants:
+  - name: addresses-never-empty
+    expr: size(self.addresses) >= 1
+    message: an empty address list takes the endpoint offline
+onFailure:
+  noLastKnownGood: closed

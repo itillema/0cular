@@ -1,0 +1,10 @@
+# Binaries built in the repository root or by release tooling
+/0cular
+/0cular.exe
+/bin/
+/dist/
+
+# Test binaries, profiles and coverage output
+*.test
+*.prof
+coverage.*

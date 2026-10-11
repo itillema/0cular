@@ -1,0 +1,9 @@
+# Store text files with LF line endings and check them out with LF on every OS.
+* text=auto eol=lf
+
+# Test fixtures are compared byte for byte, and their SHA-256 digests appear in
+# test expectations, so Git must never rewrite their line endings.
+**/testdata/** -text
+*.golden -text
+replay/*/baseline.* -text
+replay/*/candidate.* -text

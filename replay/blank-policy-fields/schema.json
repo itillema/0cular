@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quota policies (synthetic)",
+  "description": "The shape of the policy file. Like the real table, it lets a policy's limit be null: nothing here knows that a consumer reads every limit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["service", "policies"],
+  "properties": {
+    "service": { "type": "string", "minLength": 1 },
+    "policies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "resource", "limit", "period"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "resource": { "type": "string", "minLength": 1 },
+          "limit": { "type": ["integer", "null"], "minimum": 0 },
+          "period": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" }
+        }
+      }
+    }
+  }
+}

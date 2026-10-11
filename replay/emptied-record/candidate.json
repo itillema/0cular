@@ -1,0 +1,6 @@
+{
+  "endpoint": "kv.region-a.example",
+  "plan": 1017,
+  "ttl": 5,
+  "addresses": []
+}

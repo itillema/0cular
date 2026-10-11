@@ -1,0 +1,36 @@
+schemaVersion: 1
+scenario: emptied-record
+postmortem:
+  title: Summary of the Amazon DynamoDB service disruption in us-east-1
+  url: https://aws.amazon.com/message/101925/
+artifact:
+  format: json
+  baseline: baseline.json
+  candidate: candidate.json
+consumer:
+  baseline:
+    exitCode: 0
+  candidate:
+    exitCode: 1
+    stderrContains: "no addresses for kv.region-a.example"
+stages:
+  check:
+    verdict: BLOCK
+    checks:
+      - kind: invariant
+        name: addresses-never-empty
+        status: fail
+  loader:
+    outcome: rejected
+    checks:
+      - kind: invariant
+        name: addresses-never-empty
+        status: fail
+  publish:
+    outcome: stale-parent
+    note: >-
+      The delayed writer's stale plan fails publish's parent check instead of
+      overwriting the newer record. The stale plan's data arrives with task 3.6;
+      the emptied record itself is blocked by the invariant.
+  rings:
+    notApplicable: true

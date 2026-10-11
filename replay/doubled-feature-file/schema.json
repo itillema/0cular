@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bot feature file (synthetic)",
+  "description": "The shape of the feature file. Like the checks in the real pipeline, it knows nothing about the consumer's 200-feature limit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["model", "features"],
+  "properties": {
+    "model": { "type": "string", "minLength": 1 },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "weight"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "weight": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+apiVersion: 0cular/v1alpha1
+kind: Contract
+metadata:
+  name: bot-features
+artifact:
+  format: json
+  maxBytes: 1MiB
+schema:
+  jsonSchema: schema.json
+invariants:
+  - name: feature-cap
+    expr: size(self.features) <= 200
+    message: the consumer preallocates room for 200 features
+diffBudgets:
+  - name: feature-count-stable
+    measure: size(self.features)
+    maxChangePct: 20
+onFailure:
+  noLastKnownGood: closed

@@ -1,0 +1,38 @@
+service: quota-control
+policies:
+  - id: compute-api-default
+    resource: requests
+    limit: 6000
+    period: 1m
+  - id: compute-api-burst
+    resource: requests
+    limit: 1500
+    period: 10s
+  - id: storage-api-default
+    resource: requests
+    limit: 12000
+    period: 1m
+  - id: storage-api-writes
+    resource: writes
+    limit: 3000
+    period: 1m
+  - id: dns-api-default
+    resource: queries
+    limit: 50000
+    period: 1m
+  - id: iam-api-default
+    resource: requests
+    limit: 2400
+    period: 1m
+  - id: logging-api-ingest
+    resource: entries
+    limit: 100000
+    period: 1m
+  - id: billing-api-default
+    resource: requests
+    limit: 600
+    period: 1m
+  - id: billing-api-export
+    resource: requests
+    limit:
+    period: 1m

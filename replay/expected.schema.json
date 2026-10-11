@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Replay scenario expectations",
+  "description": "A replay scenario's expected.yaml: the consumer stub's behavior on its baseline and candidate, and the outcome expected at each stage of 0cular.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "scenario", "postmortem", "artifact", "consumer", "stages"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "scenario": {
+      "description": "The scenario's directory name.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "postmortem": {
+      "description": "The public postmortem the scenario follows.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "url"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "pattern": "^https://" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "baseline", "candidate"],
+      "properties": {
+        "format": { "enum": ["json", "yaml"] },
+        "baseline": { "type": "string", "pattern": "^baseline\\.(json|yaml)$" },
+        "candidate": { "type": "string", "pattern": "^candidate\\.(json|yaml)$" }
+      }
+    },
+    "consumer": {
+      "description": "How the consumer stub must behave on each file.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline", "candidate"],
+      "properties": {
+        "baseline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["exitCode"],
+          "properties": {
+            "exitCode": { "const": 0 }
+          }
+        },
+        "candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["exitCode", "stderrContains"],
+          "properties": {
+            "exitCode": { "type": "integer", "minimum": 1, "maximum": 255 },
+            "stderrContains": {
+              "description": "A substring of the stub's error output that identifies the expected failure.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "stages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check", "loader", "publish", "rings"],
+      "properties": {
+        "check": { "oneOf": [{ "$ref": "#/$defs/notApplicable" }, { "$ref": "#/$defs/checkStage" }] },
+        "loader": { "oneOf": [{ "$ref": "#/$defs/notApplicable" }, { "$ref": "#/$defs/loaderStage" }] },
+        "publish": { "oneOf": [{ "$ref": "#/$defs/notApplicable" }, { "$ref": "#/$defs/publishStage" }] },
+        "rings": { "oneOf": [{ "$ref": "#/$defs/notApplicable" }, { "$ref": "#/$defs/ringsStage" }] }
+      }
+    }
+  },
+  "$defs": {
+    "notApplicable": {
+      "description": "The stage doesn't apply to this scenario.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["notApplicable"],
+      "properties": {
+        "notApplicable": { "const": true },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "checks": {
+      "description": "The checks that don't pass, in the order the report lists them.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "name", "status"],
+        "properties": {
+          "kind": { "enum": ["envelope", "schema", "invariant", "budget", "consumerTest"] },
+          "name": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["fail", "needs-approval"] }
+        }
+      }
+    },
+    "checkStage": {
+      "description": "The gate's verdict on the candidate against the baseline.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict"],
+      "properties": {
+        "verdict": { "enum": ["PASS", "NEEDS_APPROVAL", "BLOCK"] },
+        "checks": { "$ref": "#/$defs/checks" },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "loaderStage": {
+      "description": "What a loader serving the baseline does when the candidate arrives with the gate bypassed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome"],
+      "properties": {
+        "outcome": { "enum": ["applied", "rejected", "crash-fallback"] },
+        "checks": { "$ref": "#/$defs/checks" },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "publishStage": {
+      "description": "What publish does with the candidate.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome"],
+      "properties": {
+        "outcome": { "enum": ["published", "blocked", "stale-parent"] },
+        "checks": { "$ref": "#/$defs/checks" },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ringsStage": {
+      "description": "What the rollout does when the candidate reaches the rings with the gate bypassed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome"],
+      "properties": {
+        "outcome": { "enum": ["promoted", "reverted"] },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

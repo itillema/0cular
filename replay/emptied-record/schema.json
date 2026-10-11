@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Endpoint DNS record (synthetic)",
+  "description": "The shape of the record. Like the automation that wrote it, it doesn't require any addresses at all.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["endpoint", "plan", "ttl", "addresses"],
+  "properties": {
+    "endpoint": { "type": "string", "pattern": "^[a-z0-9.-]+$" },
+    "plan": { "type": "integer", "minimum": 1 },
+    "ttl": { "type": "integer", "minimum": 1 },
+    "addresses": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
+    }
+  }
+}

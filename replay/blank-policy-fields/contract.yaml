@@ -1,0 +1,15 @@
+apiVersion: 0cular/v1alpha1
+kind: Contract
+metadata:
+  name: quota-policies
+artifact:
+  format: yaml
+  maxBytes: 1MiB
+schema:
+  jsonSchema: schema.json
+invariants:
+  - name: every-policy-has-a-limit
+    expr: self.policies.all(p, has(p.limit) && p.limit != null && p.limit > 0)
+    message: the consumer reads every policy's limit without checking for null
+onFailure:
+  noLastKnownGood: closed

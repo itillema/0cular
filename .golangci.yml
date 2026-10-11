@@ -1,0 +1,64 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - errorlint
+    - forbidigo
+    - gosec
+    - misspell
+    - nolintlint
+    - revive
+  settings:
+    forbidigo:
+      forbid:
+        - pattern: ^panic$
+          msg: library code must not panic; return an error instead
+        - pattern: ^os\.Exit$
+          msg: only a command's main function exits; return an error or an exit code instead
+        - pattern: ^(fmt\.Print(f|ln)?|print|println)$
+          msg: write to an injected io.Writer instead of standard output
+    misspell:
+      locale: US
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+  exclusions:
+    generated: strict
+    # The "comments" preset is deliberately absent: missing doc comments are reported.
+    presets:
+      - common-false-positives
+      - std-error-handling
+    rules:
+      # Tests may panic, exit from TestMain and print.
+      - path: _test\.go$
+        linters:
+          - forbidigo
+      # A command's main function is where the process exits.
+      - path: (^|/)cmd/[^/]+/main\.go$
+        text: os\.Exit
+        linters:
+          - forbidigo
+      # Replay consumer stubs are small commands that exit with a status and
+      # read the file named on their command line, by design.
+      - path: (^|/)replay/[^/]+/consumer/main\.go$
+        text: os\.Exit
+        linters:
+          - forbidigo
+      - path: (^|/)replay/[^/]+/consumer/main\.go$
+        text: G703
+        linters:
+          - gosec
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/itillema/0cular
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

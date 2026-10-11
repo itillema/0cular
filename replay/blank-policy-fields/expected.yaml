@@ -1,0 +1,36 @@
+schemaVersion: 1
+scenario: blank-policy-fields
+postmortem:
+  title: Google Cloud Service Control incident report, June 12, 2025
+  url: https://status.cloud.google.com/incidents/ow5i3PPK96RduMcb1SsW
+artifact:
+  format: yaml
+  baseline: baseline.yaml
+  candidate: candidate.yaml
+consumer:
+  baseline:
+    exitCode: 0
+  candidate:
+    exitCode: 2
+    stderrContains: "invalid memory address or nil pointer dereference"
+stages:
+  check:
+    verdict: BLOCK
+    checks:
+      - kind: invariant
+        name: every-policy-has-a-limit
+        status: fail
+  loader:
+    outcome: rejected
+    checks:
+      - kind: invariant
+        name: every-policy-has-a-limit
+        status: fail
+  publish:
+    outcome: blocked
+    checks:
+      - kind: invariant
+        name: every-policy-has-a-limit
+        status: fail
+  rings:
+    notApplicable: true

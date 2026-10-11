@@ -1,0 +1,50 @@
+name: Bug report
+description: Something in 0cular doesn't work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For a security vulnerability, don't open an issue: follow [SECURITY.md](https://github.com/itillema/0cular/blob/main/SECURITY.md) instead.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `0cular version`, or the commit you built from.
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - CLI
+        - GitHub Action
+        - Go library
+        - Loader or agent
+        - Publish and stores
+        - Rings and promoter
+        - Replay suite
+        - Docs
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The exact command, plus a minimal contract and artifact. Remove secrets and real customer data first.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS and architecture, the Go version if you built from source, and the store or consumer involved.

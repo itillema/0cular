@@ -1,0 +1,42 @@
+schemaVersion: 1
+scenario: doubled-feature-file
+postmortem:
+  title: Cloudflare outage on November 18, 2025
+  url: https://blog.cloudflare.com/18-november-2025-outage/
+artifact:
+  format: json
+  baseline: baseline.json
+  candidate: candidate.json
+consumer:
+  baseline:
+    exitCode: 0
+  candidate:
+    exitCode: 2
+    stderrContains: "index out of range [200] with length 200"
+stages:
+  check:
+    verdict: BLOCK
+    checks:
+      - kind: invariant
+        name: feature-cap
+        status: fail
+      - kind: budget
+        name: feature-count-stable
+        status: needs-approval
+  loader:
+    outcome: rejected
+    checks:
+      - kind: invariant
+        name: feature-cap
+        status: fail
+  publish:
+    outcome: blocked
+    checks:
+      - kind: invariant
+        name: feature-cap
+        status: fail
+      - kind: budget
+        name: feature-count-stable
+        status: needs-approval
+  rings:
+    notApplicable: true
