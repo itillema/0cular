@@ -13,7 +13,7 @@ How the plan is kept:
 | --- | --- |
 | Current phase | Phase 1 — v0.1 "Check": in progress |
 | Last updated | 2026-10-12 |
-| Next task | 1.3 `report`: text, Markdown and JSON renderers, with escaping golden tests. Done so far: 1.1 `contract` and 1.2 `eval` |
+| Next task | 1.4 CLI: `check`, `diff`, `replay run` and the exit codes, with `contract lint` and `contract schema` already done. Done so far: 1.1 `contract`, 1.2 `eval` and 1.3 `report` |
 | Blocked on | The maintainer's review of the work since Phase 1 began |
 | Latest release | None |
 | Planned releases | v0.1 Check, v0.2 Keep, v0.3 Publish, v0.4 Rings |
@@ -152,6 +152,7 @@ It complements Argo Rollouts and Flagger (pods), flag tools (per-user flags) and
 | `diffBudgets[]` | list | Measure and collection budgets on change against the baseline; NEEDS_APPROVAL on breach unless `overridable: false` |
 | `consumerTests[]` (v0.3) | list | `name`, `run` (argv), `container`, `sandbox`, `env`, `timeout`, `expectExit`, optional `replay` |
 | `rollout` (v0.4) | object | `rings[]` (`name`, `upTo` bucket, `minInstances`, `instances`), `bake`, `health` (§3.9) |
+| `report.redact` | list | Field-name patterns whose values reports hide, in addition to the built-in `password`, `passwd`, `secret`, `token`, `credential`, `apikey`, `privatekey` and `authorization`. Matching ignores case and everything but letters and digits (ADR-0015) |
 | `onFailure` | object | `noLastKnownGood`: `closed` (default) or `open`; `trustLastKnownGood`: default `false` (ADR-0009). `parseError`, `invariantViolation` and `fetchError` accept only `stale`; lint rejects `open` and `closed` there |
 
 **CEL environment:**
@@ -498,6 +499,7 @@ Exit codes are in Appendix F.
   - text output replaces control and bidi characters.
 
   Golden tests feed every renderer HTML tags, backticks, pipes, @mentions, newlines, very long strings and Unicode bidi characters.
+- **Reports hide secrets.** Evidence shows `[redacted]` in place of a value read through a field whose name contains a built-in pattern, such as `password` or `token`, or one from the contract's `report.redact` (ADR-0015).
 - **Least privilege.** Publisher credentials can write blobs and the pointer; consumers read through `Source`; the promoter can write only the pointer.
 - **Integrity.** SHA-256 is verified on every load. Optional Sigstore signatures on artifacts come later.
 - **Supply chain:** cosign keyless signatures, SLSA provenance, a syft SBOM, Actions pinned by SHA, zizmor, Dependabot and OpenSSF Scorecard, plus minimal dependencies and govulncheck in CI.
@@ -599,7 +601,7 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
   - measure and collection budgets, and deterministic results.
 
   Fuzz the decoders and the evaluator; property-test the budget math.
-- [ ] 1.3 `report`: text, Markdown and JSON (`schemaVersion: 1`) with evidence values, escaped as §3.12 requires. Add golden-file tests, including the hostile values.
+- [x] 1.3 `report`: text, Markdown and JSON (`schemaVersion: 1`) with evidence values, escaped as §3.12 requires, and secret values redacted (ADR-0015). Add golden-file tests, including the hostile values.
 - [ ] 1.4 CLI: `check` (with `--baseline` or `--no-baseline`), `diff`, `contract lint`, `contract schema`, `replay run` and `version`, with the exit codes in Appendix F.
 - [ ] 1.5 `gate` library: `Check` with bound approvals (§3.4), plus examples.
 - [ ] 1.6 GitHub Action (§3.11): the composite action in `action/`, the contract from the base ref, annotations and a Job Summary, and the optional two-workflow sticky comment. It builds from source until v0.1.0 exists.

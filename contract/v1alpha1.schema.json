@@ -79,6 +79,20 @@
       "type": "array",
       "items": { "$ref": "#/$defs/diffBudget" }
     },
+    "report": {
+      "description": "What reports show of the artifact. They never show a value read through a field whose name contains password, passwd, secret, token, credential, apikey, privatekey or authorization, ignoring case and everything but letters and digits (ADR-0015).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "redact": {
+          "description": "More field-name patterns whose values reports hide, matched like the built-in ones: a field matches when its name contains a pattern, ignoring case and everything but letters and digits.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "\\p{L}" }
+        }
+      }
+    },
     "onFailure": {
       "description": "What a loader does when a version fails. With a last known good, every failure keeps it; the policy applies only without one.",
       "type": "object",

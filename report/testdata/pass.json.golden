@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "verdict": "PASS",
+  "contract": {
+    "name": "quota-policies",
+    "digest": "sha256:c0ffee0000000000000000000000000000000000000000000000000000000000"
+  },
+  "candidate": {
+    "key": "",
+    "size": 512,
+    "digest": "sha256:dd56000000000000000000000000000000000000000000000000000000000000"
+  },
+  "baseline": null,
+  "checks": [
+    {
+      "kind": "envelope",
+      "name": "candidate",
+      "status": "pass",
+      "message": "",
+      "evidence": "512 B ≤ 1 MiB; valid YAML",
+      "cost": 0,
+      "durationMs": 0
+    },
+    {
+      "kind": "invariant",
+      "name": "every-policy-has-a-limit",
+      "status": "pass",
+      "message": "",
+      "evidence": "",
+      "cost": 40,
+      "durationMs": 0
+    },
+    {
+      "kind": "budget",
+      "name": "policy-count-stable",
+      "status": "skipped",
+      "message": "",
+      "evidence": "there's no baseline to compare with",
+      "cost": 0,
+      "durationMs": 0
+    }
+  ]
+}

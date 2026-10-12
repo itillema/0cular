@@ -153,7 +153,7 @@ func TestCollectionBudgets(t *testing.T) {
 			candidate: `{"policies": [{"id": "b", "limit": 2}, {"id": "c", "limit": 30}, {"id": "d", "limit": 4}]}`,
 			status:    StatusPass,
 			evidence:  "3 → 3 items: 1 removed, 1 added, 1 changed (33.3%); budget at most 1 removed, 1 added, 50% changed",
-			values:    &BudgetValues{BaselineItems: 3, CandidateItems: 3, Removed: 1, Added: 1, Changed: 1},
+			values:    &BudgetValues{Collection: true, BaselineItems: 3, CandidateItems: 3, Removed: 1, Added: 1, Changed: 1},
 		},
 		{
 			name:      "over the budget",
@@ -161,7 +161,7 @@ func TestCollectionBudgets(t *testing.T) {
 			candidate: `{"policies": [{"id": "b", "limit": 2}, {"id": "c", "limit": 30}]}`,
 			status:    StatusNeedsApproval,
 			evidence:  "3 → 2 items: 1 removed, 0 added, 1 changed (33.3%); budget at most 0 removed, 10% changed",
-			values:    &BudgetValues{BaselineItems: 3, CandidateItems: 2, Removed: 1, Changed: 1, Breached: []string{"maxRemoved", "maxChangedPct"}},
+			values:    &BudgetValues{Collection: true, BaselineItems: 3, CandidateItems: 2, Removed: 1, Changed: 1, Breached: []string{"maxRemoved", "maxChangedPct"}},
 		},
 		{
 			name:      "keys match as CEL compares them",
@@ -169,7 +169,7 @@ func TestCollectionBudgets(t *testing.T) {
 			candidate: `{"policies": [{"id": "x", "limit": 1.0}, {"id": "b", "limit": 2}, {"id": "c", "limit": 3}]}`,
 			status:    StatusPass,
 			evidence:  "3 → 3 items: 0 removed, 0 added, 1 changed (33.3%); budget at most 0 removed, 0 added",
-			values:    &BudgetValues{BaselineItems: 3, CandidateItems: 3, Changed: 1},
+			values:    &BudgetValues{Collection: true, BaselineItems: 3, CandidateItems: 3, Changed: 1},
 		},
 		{
 			name:      "items that CEL built",
@@ -177,7 +177,7 @@ func TestCollectionBudgets(t *testing.T) {
 			candidate: `{"policies": [{"id": "b", "limit": 2}, {"id": "c", "limit": 30}, {"id": "d", "limit": 4}]}`,
 			status:    StatusPass,
 			evidence:  "3 → 3 items: 1 removed, 1 added, 1 changed (33.3%); budget at most 1 removed, 1 added, 50% changed",
-			values:    &BudgetValues{BaselineItems: 3, CandidateItems: 3, Removed: 1, Added: 1, Changed: 1},
+			values:    &BudgetValues{Collection: true, BaselineItems: 3, CandidateItems: 3, Removed: 1, Added: 1, Changed: 1},
 		},
 		{
 			name:      "a list of numbers",
@@ -185,7 +185,7 @@ func TestCollectionBudgets(t *testing.T) {
 			candidate: `{"policies": [{"id": "a", "limit": 1}, {"id": "b", "limit": 5}]}`,
 			status:    StatusNeedsApproval,
 			evidence:  "3 → 2 items: 2 removed, 1 added, 0 changed (0%); budget at most 1 removed",
-			values:    &BudgetValues{BaselineItems: 3, CandidateItems: 2, Removed: 2, Added: 1, Breached: []string{"maxRemoved"}},
+			values:    &BudgetValues{Collection: true, BaselineItems: 3, CandidateItems: 2, Removed: 2, Added: 1, Breached: []string{"maxRemoved"}},
 		},
 		{
 			name:      "a repeated key",
@@ -237,7 +237,7 @@ func TestCollectionBudgetsShareDiffs(t *testing.T) {
 		byName[c.Name] = c
 	}
 	removals, changes, byLimit := byName["removals"], byName["changes"], byName["by-limit"]
-	shared := &BudgetValues{BaselineItems: 2, CandidateItems: 1, Removed: 1, Changed: 1}
+	shared := &BudgetValues{Collection: true, BaselineItems: 2, CandidateItems: 1, Removed: 1, Changed: 1}
 	if diff := cmp.Diff(shared, removals.Budget, cmpopts.IgnoreFields(BudgetValues{}, "Breached")); diff != "" {
 		t.Errorf("removals mismatch (-want +got):\n%s", diff)
 	}

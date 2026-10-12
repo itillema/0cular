@@ -157,15 +157,21 @@ func (d *jsonDecoder) number(n json.Number, start int) (any, error) {
 	if !strings.ContainsAny(s, ".eE") {
 		i, err := strconv.ParseInt(s, 10, 64)
 		if err != nil || i > MaxSafeInteger || i < -MaxSafeInteger {
-			return nil, d.errorAt(ErrNumber, start, integerMessage(s, d.path))
+			return nil, quoting(d.errorAt(ErrNumber, start, integerMessage(s, d.path)), s)
 		}
 		return float64(i), nil
 	}
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		return nil, d.errorAt(ErrNumber, start, fmt.Sprintf("the number %s at %s is too large for a double", s, d.path.where()))
+		return nil, quoting(d.errorAt(ErrNumber, start, fmt.Sprintf("the number %s at %s is too large for a double", s, d.path.where())), s)
 	}
 	return f + 0, nil // + 0 turns -0 into 0.
+}
+
+// quoting records the value that an error's message quotes.
+func quoting(err *DecodeError, value string) *DecodeError {
+	err.Value = value
+	return err
 }
 
 func integerMessage(text string, p path) string {

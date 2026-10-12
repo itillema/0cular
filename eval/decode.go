@@ -67,6 +67,10 @@ type DecodeError struct {
 	Line, Column int
 	// Message describes the problem.
 	Message string
+	// Value is the text of the artifact's value that Message quotes, such
+	// as an integer too large for a double, or empty if it quotes none.
+	// Reports hide it when the value's field holds a secret (ADR-0015).
+	Value string
 }
 
 // Error returns the message, after the line and column when they're known.

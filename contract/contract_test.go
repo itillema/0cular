@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -62,6 +63,8 @@ diffBudgets:
     maxAdded: 0
     maxChangedPct: 10
     overridable: false
+report:
+  redact: [ssn, pin_code]
 onFailure:
   noLastKnownGood: open
   trustLastKnownGood: true
@@ -107,6 +110,7 @@ func TestParse(t *testing.T) {
 				MaxChangedPct: ptr(10.0),
 			},
 		},
+		Report:    Report{Redact: []string{"ssn", "pin_code"}},
 		OnFailure: OnFailure{NoLastKnownGood: PolicyOpen, TrustLastKnownGood: true},
 		Digest:    "sha256:" + hex.EncodeToString(sum[:]),
 	}
@@ -213,7 +217,7 @@ var problemCases = []problemCase{
 	{
 		name: "unknown field without a hint",
 		src:  header + "owner: me\n",
-		want: "8:1: owner: unknown field; the fields here are apiVersion, kind, metadata, artifact, schema, invariants, diffBudgets and onFailure",
+		want: "8:1: owner: unknown field; the fields here are apiVersion, kind, metadata, artifact, schema, invariants, diffBudgets, report and onFailure",
 	},
 	{name: "unknown nested field", src: header + "schema:\n  jsonSchema: s.json\n  draft: 2020-12\n", want: "10:3: schema.draft: unknown field; the only field here is jsonSchema"},
 	{name: "duplicate key", src: header + "artifact:\n  format: yaml\n", want: "8:1: artifact: duplicate key; it's already set on line 5"},
@@ -342,6 +346,46 @@ var problemCases = []problemCase{
 			"11:15: onFailure.fetchError: must be stale",
 	},
 	{name: "unknown policy", src: header + "onFailure:\n  noLastKnownGood: maybe\n", want: "9:20: onFailure.noLastKnownGood: must be closed or open"},
+
+	// report.
+	{name: "report not a mapping", src: header + "report: [ssn]\n", want: "8:9: report: must be a mapping, not a list"},
+	{name: "unknown report field", src: header + "report: {hide: [ssn]}\n", want: "8:10: report.hide: unknown field; the only field here is redact"},
+	{name: "redact not a list", src: header + "report: {redact: ssn}\n", want: "8:18: report.redact: must be a list, not a string"},
+	{
+		name: "patterns",
+		src:  header + "report:\n  redact: ['', '  ', 42, '123', '--']\n",
+		want: "9:12: report.redact[0]: must not be empty\n" +
+			"9:16: report.redact[1]: must not be empty\n" +
+			"9:22: report.redact[2]: must be a string, not an integer; quote it if you mean \"42\"\n" +
+			"9:26: report.redact[3]: must hold a letter: matching ignores everything but letters and digits\n" +
+			"9:33: report.redact[4]: must hold a letter: matching ignores everything but letters and digits",
+	},
+	{
+		name: "patterns that match the same names",
+		src:  header + "report:\n  redact: [SSN, 'ssn', s-s-n]\n",
+		want: "9:17: report.redact[1]: is the same pattern as report.redact[0], since matching ignores case and everything but letters and digits\n" +
+			"9:24: report.redact[2]: is the same pattern as report.redact[0], since matching ignores case and everything but letters and digits",
+		schemaMisses: "uniqueItems compares patterns as written, but matching ignores case and everything but letters and digits",
+	},
+	{
+		name: "long pattern",
+		src:  header + "report:\n  redact: [" + strings.Repeat("x", MaxRedactPatternRunes+1) + "]\n",
+		want: "9:12: report.redact[0]: must be at most 64 characters",
+	},
+	{
+		name: "too many patterns",
+		src:  header + "report:\n  redact: [" + manyPatterns(MaxRedactPatterns+1) + "]\n",
+		want: "9:11: report.redact: holds 65 patterns; the limit is 64",
+	},
+}
+
+// manyPatterns returns n distinct patterns, separated by commas.
+func manyPatterns(n int) string {
+	patterns := make([]string, n)
+	for i := range patterns {
+		patterns[i] = "field" + strings.Repeat("x", i%8) + strconv.Itoa(i)
+	}
+	return strings.Join(patterns, ", ")
 }
 
 func TestParseProblems(t *testing.T) {

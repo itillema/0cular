@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "verdict": "BLOCK",
+  "contract": {
+    "name": "bot-features",
+    "digest": "sha256:c0ffee0000000000000000000000000000000000000000000000000000000000"
+  },
+  "candidate": {
+    "key": "config/bot-features.json",
+    "size": 1843,
+    "digest": "sha256:bb12cd34ef56000000000000000000000000000000000000000000000000000"
+  },
+  "baseline": {
+    "key": "config/bot-features.json",
+    "size": 921,
+    "digest": "sha256:aa34000000000000000000000000000000000000000000000000000000000000"
+  },
+  "checks": [
+    {
+      "kind": "envelope",
+      "name": "candidate",
+      "status": "pass",
+      "message": "",
+      "evidence": "1.8 KiB ≤ 5 MiB; valid JSON",
+      "cost": 0,
+      "durationMs": 1.25
+    },
+    {
+      "kind": "envelope",
+      "name": "baseline",
+      "status": "pass",
+      "message": "",
+      "evidence": "921 B ≤ 5 MiB; valid JSON",
+      "cost": 0,
+      "durationMs": 0.8
+    },
+    {
+      "kind": "schema",
+      "name": "bot-features.schema.json",
+      "status": "fail",
+      "message": "",
+      "evidence": "at /features/3/name: does not match pattern '^feature-[0-9]+$'; and 2 more",
+      "violations": [
+        {
+          "pointer": "/features/3/name",
+          "keyword": "/properties/features/items/properties/name/pattern",
+          "message": "does not match pattern '^feature-[0-9]+$'"
+        },
+        {
+          "pointer": "/features/7",
+          "keyword": "/properties/features/items/required",
+          "message": "missing property 'weight'"
+        }
+      ],
+      "violationCount": 3,
+      "cost": 0,
+      "durationMs": 2
+    },
+    {
+      "kind": "invariant",
+      "name": "feature-cap",
+      "status": "fail",
+      "message": "the proxy preallocates 200 features",
+      "evidence": "size(self.features) = 240, not \u003c= 200",
+      "cost": 3,
+      "durationMs": 0.05
+    },
+    {
+      "kind": "invariant",
+      "name": "every-feature-named",
+      "status": "pass",
+      "message": "",
+      "evidence": "",
+      "cost": 1201,
+      "durationMs": 0
+    },
+    {
+      "kind": "invariant",
+      "name": "unique-names",
+      "status": "error",
+      "message": "",
+      "evidence": "the expression exceeded its cost limit of 1000000",
+      "cost": 0,
+      "durationMs": 0
+    },
+    {
+      "kind": "budget",
+      "name": "feature-count-stable",
+      "status": "needs-approval",
+      "message": "",
+      "evidence": "120 → 240 (+100%); budget ±20%",
+      "budget": {
+        "kind": "measure",
+        "baseline": 120,
+        "candidate": 240,
+        "breached": [
+          "maxChangePct"
+        ]
+      },
+      "cost": 4,
+      "durationMs": 0
+    },
+    {
+      "kind": "budget",
+      "name": "feature-churn",
+      "status": "pass",
+      "message": "",
+      "evidence": "120 → 240 items: 0 removed, 120 added, 0 changed (0%); budget at most 5 removed",
+      "budget": {
+        "kind": "collection",
+        "baselineItems": 120,
+        "candidateItems": 240,
+        "removed": 0,
+        "added": 120,
+        "changed": 0,
+        "breached": []
+      },
+      "cost": 1440,
+      "durationMs": 0
+    },
+    {
+      "kind": "budget",
+      "name": "pin-stable",
+      "status": "pass",
+      "message": "",
+      "evidence": "[redacted] → [redacted]; budget ±1%",
+      "budget": {
+        "kind": "measure",
+        "redacted": true,
+        "breached": []
+      },
+      "cost": 2,
+      "durationMs": 0
+    }
+  ]
+}

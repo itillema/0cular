@@ -215,6 +215,63 @@ func (p *Program) ListSource() (path []string, same, ok bool) {
 	return path, same, true
 }
 
+// ReadsRedacted reports whether the expression reads a value through a
+// field that redact matches, by name or by an index such as
+// self["api_key"], or through a loop over such a value. A value inside
+// size() doesn't count, since size returns only a count (ADR-0015).
+func (p *Program) ReadsRedacted(redact Redact) bool {
+	return readsSecret(p.ast.NativeRep().Expr(), redact, nil)
+}
+
+// readsSecret reports whether e reads a value through a field that redact
+// matches, or through one of the secret loop variables, outside size().
+func readsSecret(e celast.Expr, redact Redact, secret map[string]bool) bool {
+	if redact == nil && len(secret) == 0 {
+		return false
+	}
+	switch e.Kind() {
+	case celast.IdentKind:
+		return secret[e.AsIdent()]
+	case celast.SelectKind:
+		sel := e.AsSelect()
+		if !sel.IsTestOnly() && redact != nil && redact(sel.FieldName()) {
+			return true
+		}
+		return readsSecret(sel.Operand(), redact, secret)
+	case celast.CallKind:
+		call := e.AsCall()
+		args := call.Args()
+		switch {
+		case call.FunctionName() == "size":
+			return false
+		case call.FunctionName() == operators.Index && len(args) == 2 && args[1].Kind() == celast.LiteralKind:
+			if field, ok := args[1].AsLiteral().(types.String); ok && redact != nil && redact(string(field)) {
+				return true
+			}
+		}
+		if call.IsMemberFunction() && readsSecret(call.Target(), redact, secret) {
+			return true
+		}
+		return slices.ContainsFunc(args, func(a celast.Expr) bool { return readsSecret(a, redact, secret) })
+	case celast.ListKind:
+		return slices.ContainsFunc(e.AsList().Elements(), func(a celast.Expr) bool { return readsSecret(a, redact, secret) })
+	case celast.MapKind:
+		for _, entry := range e.AsMap().Entries() {
+			if entry.Kind() == celast.MapEntryKind && (readsSecret(entry.AsMapEntry().Key(), redact, secret) || readsSecret(entry.AsMapEntry().Value(), redact, secret)) {
+				return true
+			}
+		}
+	case celast.ComprehensionKind:
+		c := e.AsComprehension()
+		if readsSecret(c.IterRange(), redact, secret) {
+			return true
+		}
+		return readsSecret(c.AccuInit(), redact, secret) || readsSecret(c.LoopCondition(), redact, secret) ||
+			readsSecret(c.LoopStep(), redact, secret) || readsSecret(c.Result(), redact, secret)
+	}
+	return false
+}
+
 // Reads reports whether the expression reads the variable name, other than
 // through a comprehension variable of the same name.
 func (p *Program) Reads(name string) bool {

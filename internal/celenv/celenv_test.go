@@ -398,8 +398,77 @@ func TestExplain(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Compile(%q) error = %v", tt.expr, err)
 		}
-		if got := prg.Explain(t.Context(), vars()); got != tt.want {
+		if got := prg.Explain(t.Context(), vars(), nil); got != tt.want {
 			t.Errorf("Explain(%q) = %q, want %q", tt.expr, got, tt.want)
+		}
+	}
+}
+
+// secretFields is a Redact for the tests: it matches token and password.
+func secretFields(field string) bool {
+	return strings.Contains(strings.ToLower(field), "token") || strings.Contains(strings.ToLower(field), "password")
+}
+
+func TestExplainRedacts(t *testing.T) {
+	self := map[string]any{
+		"auth":   map[string]any{"token": "s3cr3t", "user": "ops"},
+		"tokens": []any{"a", "short"},
+		"users":  []any{map[string]any{"name": "ann", "password": "hunter2"}},
+		"limits": map[string]any{"token_bucket": 5.0},
+		"count":  3.0,
+	}
+	env := newEnv(t, Rules, Limits{})
+	tests := []struct{ expr, want string }{
+		{"self.auth.token == 'expected'", `self.auth.token = [redacted], not == "expected"`},
+		{"self.auth['token'] == 'expected'", `self.auth["token"] = [redacted], not == "expected"`},
+		{"self.auth == {}", `self.auth = {"token": [redacted], "user": "ops"}, not == {} ({})`},
+		{"self.count == self.auth.token", "self.count = 3, not == self.auth.token ([redacted])"},
+		{"size(self.auth.token) > 10", "size(self.auth.token) = 6, not > 10"},
+		{"self.tokens.all(t, size(t) > 2 && t != 'short')", "fails for self.tokens[0]: size(t) = 1, not > 2"},
+		{"self.tokens.all(t, t != 'a')", "fails for self.tokens[0]: t = [redacted], not != \"a\""},
+		{"self.users.all(u, u.name != 'ann')", `fails for self.users[0]: u.name = "ann", not != "ann"`},
+		{"self.users.all(u, u == {})", `fails for self.users[0]: u = {"name": "ann", "password": [redacted]}, not == {} ({})`},
+		{"self.limits.all(k, k != 'token_bucket')", `fails for self.limits key "token_bucket": k = "token_bucket", not != "token_bucket"`},
+		{"self.limits.token_bucket < 1.0", "self.limits.token_bucket = [redacted], not < 1.0"},
+	}
+	for _, tt := range tests {
+		prg, err := env.Compile(tt.expr, Bool)
+		if err != nil {
+			t.Fatalf("Compile(%q) error = %v", tt.expr, err)
+		}
+		got := prg.Explain(t.Context(), map[string]any{VarSelf: self, VarBaseline: nil, VarMeta: Meta{}.Value()}, secretFields)
+		if got != tt.want {
+			t.Errorf("Explain(%q) = %q, want %q", tt.expr, got, tt.want)
+		}
+	}
+}
+
+func TestReadsRedacted(t *testing.T) {
+	env := newEnv(t, Rules, Limits{})
+	for expr, want := range map[string]bool{
+		"self.auth.token":                         true,
+		"self.auth['token']":                      true,
+		"self.auth[self.field]":                   false,
+		"self.tokens.map(t, t + 'x')":             true,
+		"self.users.map(u, u.password)":           true,
+		"self.users.map(u, u.name)":               false,
+		"size(self.auth.token)":                   false,
+		"self.auth.token.size()":                  false,
+		"has(self.auth.token)":                    false,
+		"self.auth.token.lowerAscii()":            true,
+		"[self.a, {'k': self.b.password}]":        true,
+		"self.users.exists(u, u.password == 'x')": true,
+		"meta.key": false,
+	} {
+		p, err := env.Compile(expr, Any)
+		if err != nil {
+			t.Fatalf("Compile(%q) error = %v", expr, err)
+		}
+		if got := p.ReadsRedacted(secretFields); got != want {
+			t.Errorf("ReadsRedacted(%q) = %v, want %v", expr, got, want)
+		}
+		if p.ReadsRedacted(nil) {
+			t.Errorf("ReadsRedacted(%q) with no Redact = true, want false", expr)
 		}
 	}
 }
@@ -415,11 +484,15 @@ func TestShow(t *testing.T) {
 		types.NullValue:      "null",
 		types.DefaultTypeAdapter.NativeToValue(map[string]any{"b": []any{1.0, "x"}, "a": nil}): `{"a": null, "b": [1, "x"]}`,
 	} {
-		if got := Show(v); got != want {
+		if got := Show(v, nil); got != want {
 			t.Errorf("Show(%v) = %q, want %q", v, got, want)
 		}
 	}
-	got := Show(types.String(long))
+	nested := types.DefaultTypeAdapter.NativeToValue(map[string]any{"db": map[string]any{"password": "x", "host": "h"}, "tokens": []any{"t"}})
+	if got, want := Show(nested, secretFields), `{"db": {"host": "h", "password": [redacted]}, "tokens": [redacted]}`; got != want {
+		t.Errorf("Show(nested secrets) = %q, want %q", got, want)
+	}
+	got := Show(types.String(long), nil)
 	if utf8.RuneCountInString(got) != maxShownRunes || !strings.HasSuffix(got, "\xe2\x80\xa6") {
 		t.Errorf("Show(a long string) = %q, want %d characters ending in an ellipsis", got, maxShownRunes)
 	}

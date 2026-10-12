@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "verdict": "BLOCK",
+  "contract": {
+    "name": "\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e",
+    "digest": "sha256:\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e"
+  },
+  "candidate": {
+    "key": "`code` and ``` fences ``` and ~~~",
+    "size": 1,
+    "digest": "sha256:\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e"
+  },
+  "baseline": {
+    "key": "a | b || c \\| d",
+    "size": 2,
+    "digest": "sha256:\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e"
+  },
+  "checks": [
+    {
+      "kind": "schema",
+      "name": "@octocat, @org/team, #123, owner/repo#45 and someone@example.com",
+      "status": "fail",
+      "message": "line one\nline two\r\n\ttabbed",
+      "evidence": "\u001b[31mred\u001b[0m, NUL \u0000, DEL \u007f, NEL \u0085 and LS \u2028",
+      "violations": [
+        {
+          "pointer": "line one\nline two\r\n\ttabbed",
+          "keyword": "",
+          "message": "\u001b[31mred\u001b[0m, NUL \u0000, DEL \u007f, NEL \u0085 and LS \u2028"
+        },
+        {
+          "pointer": "\u202eevil\u202c, \u2066isolate\u2069, zero\u200bwidth, tag \udb40\udc41",
+          "keyword": "",
+          "message": "**bold** _em_ [link](https://example.com) ![img](https://example.com/x.png) # heading \u003e quote - item $math$ ~~strike~~ \u0026lt;entity\u0026gt; \u0026#64;"
+        },
+        {
+          "pointer": "bad \ufffd byte and \ufffd\ufffd truncated",
+          "keyword": "",
+          "message": "long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long "
+        }
+      ],
+      "violationCount": 5,
+      "cost": 0,
+      "durationMs": 0
+    },
+    {
+      "kind": "invariant",
+      "name": "\u202eevil\u202c, \u2066isolate\u2069, zero\u200bwidth, tag \udb40\udc41",
+      "status": "error",
+      "message": "**bold** _em_ [link](https://example.com) ![img](https://example.com/x.png) # heading \u003e quote - item $math$ ~~strike~~ \u0026lt;entity\u0026gt; \u0026#64;",
+      "evidence": "bad \ufffd byte and \ufffd\ufffd truncated",
+      "cost": 0,
+      "durationMs": 0
+    },
+    {
+      "kind": "budget",
+      "name": "long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long ",
+      "status": "needs-approval",
+      "message": "✓ 中文 👍 ok",
+      "evidence": "\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e",
+      "budget": {
+        "kind": "measure",
+        "baseline": 0,
+        "candidate": 0,
+        "breached": [
+          "\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e"
+        ]
+      },
+      "cost": 0,
+      "durationMs": 0
+    },
+    {
+      "kind": "invariant",
+      "name": "`code` and ``` fences ``` and ~~~",
+      "status": "pass",
+      "message": "a | b || c \\| d",
+      "evidence": "@octocat, @org/team, #123, owner/repo#45 and someone@example.com",
+      "cost": 0,
+      "durationMs": 0
+    }
+  ]
+}

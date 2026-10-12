@@ -17,6 +17,7 @@ import (
 
 	"github.com/itillema/0cular/contract"
 	"github.com/itillema/0cular/internal/celenv"
+	"github.com/itillema/0cular/internal/redact"
 )
 
 // Verdict is the outcome of checking a candidate.
@@ -144,6 +145,8 @@ type Evaluator struct {
 	schema     *Schema
 	invariants []compiledInvariant
 	budgets    []compiledBudget
+	// redact matches the fields whose values evidence hides (ADR-0015).
+	redact *redact.Matcher
 }
 
 type compiledInvariant struct {
@@ -165,7 +168,7 @@ func New(c *contract.Contract) (*Evaluator, error) {
 	if err != nil {
 		problems = append(problems, contract.Problem{Pos: c.Position("schema.jsonSchema"), Path: "schema.jsonSchema", Message: err.Error()})
 	}
-	e := &Evaluator{contract: c, schema: schema}
+	e := &Evaluator{contract: c, schema: schema, redact: redact.New(c.Report.Redact)}
 	for i, inv := range c.Invariants {
 		path := fmt.Sprintf("invariants[%d].expr", i)
 		program, err := env.rules.Compile(inv.Expr, celenv.Bool)
@@ -178,6 +181,9 @@ func New(c *contract.Contract) (*Evaluator, error) {
 	for i, b := range c.DiffBudgets {
 		budget, budgetProblems := compileBudget(c, i, b, env)
 		problems = append(problems, budgetProblems...)
+		budget.secretMeasure = budget.measure != nil && budget.measure.ReadsRedacted(e.redact.Field)
+		budget.secretKeys = budget.collection != nil && budget.key != nil &&
+			(budget.collection.ReadsRedacted(e.redact.Field) || budget.key.ReadsRedacted(e.redact.Field))
 		e.budgets = append(e.budgets, budget)
 	}
 	if len(problems) > 0 {
@@ -302,7 +308,7 @@ func (e *Evaluator) envelope(ctx context.Context, name string, in Input) (*Docum
 		check.Evidence = fmt.Sprintf("%s ≤ %s; valid %s", FormatSize(doc.Size), FormatSize(a.MaxBytes), strings.ToUpper(string(a.Format)))
 	case errors.As(err, &de):
 		check.Status = StatusFail
-		check.Evidence = de.Error()
+		check.Evidence = e.decodeEvidence(de)
 	case ctx.Err() != nil:
 		return nil, Check{}, ctx.Err()
 	default:
@@ -311,6 +317,18 @@ func (e *Evaluator) envelope(ctx context.Context, name string, in Input) (*Docum
 	}
 	check.Duration = time.Since(start)
 	return doc, check, nil
+}
+
+// decodeEvidence describes a decode error, hiding the value it quotes when
+// the value's field holds a secret.
+func (e *Evaluator) decodeEvidence(de *DecodeError) string {
+	if de.Value == "" || !e.redact.Pointer(de.Pointer) {
+		return de.Error()
+	}
+	hidden := *de
+	hidden.Message = strings.Replace(de.Message, de.Value, redact.Marker, 1)
+	hidden.Value = redact.Marker
+	return hidden.Error()
 }
 
 func (e *Evaluator) schemaCheck(cand *Document) Check {
@@ -325,6 +343,12 @@ func (e *Evaluator) schemaCheck(cand *Document) Check {
 	if total == 0 {
 		check.Status = StatusPass
 		return check
+	}
+	for i, v := range violations {
+		// A message can quote the value, such as one that fails a pattern.
+		if e.redact.Pointer(v.Pointer) {
+			violations[i].Message = redact.Marker + " fails the schema's " + keywordName(v.Keyword)
+		}
 	}
 	check.Status, check.Violations, check.ViolationCount = StatusFail, violations, total
 	check.Evidence = describeViolation(violations[0])
@@ -360,12 +384,22 @@ func (e *Evaluator) invariantCheck(ctx context.Context, inv compiledInvariant, c
 		check.Status = StatusPass
 	default:
 		check.Status = StatusFail
-		if check.Evidence = inv.program.Explain(ctx, vars); check.Evidence == "" {
+		if check.Evidence = inv.program.Explain(ctx, vars, e.redact.Field); check.Evidence == "" {
 			check.Evidence = inv.Expr + " is false"
 		}
 	}
 	check.Duration = time.Since(start)
 	return check, nil
+}
+
+// keywordName returns the name of the schema keyword a JSON Pointer points
+// to, such as pattern for /properties/token/pattern.
+func keywordName(pointer string) string {
+	name := pointer[strings.LastIndexByte(pointer, '/')+1:]
+	if name == "" {
+		return "rules"
+	}
+	return strings.ReplaceAll(strings.ReplaceAll(name, "~1", "/"), "~0", "~")
 }
 
 // meta returns the meta variable for doc.

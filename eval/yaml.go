@@ -256,13 +256,13 @@ func (d *yamlDecoder) scalar(n *yaml.Node) (any, error) {
 	case yamlx.KindInt:
 		i, err := yamlx.ParseInt(n.Value)
 		if err != nil || i > MaxSafeInteger || i < -MaxSafeInteger {
-			return nil, d.errorAt(ErrNumber, n, integerMessage(n.Value, d.path))
+			return nil, quoting(d.errorAt(ErrNumber, n, integerMessage(n.Value, d.path)), n.Value)
 		}
 		return float64(i), nil
 	case yamlx.KindFloat:
 		f, err := yamlx.ParseFloat(n.Value)
 		if err != nil || math.IsInf(f, 0) || math.IsNaN(f) {
-			return nil, d.errorAt(ErrNumber, n, fmt.Sprintf("the number %s at %s isn't finite", n.Value, d.path.where()))
+			return nil, quoting(d.errorAt(ErrNumber, n, fmt.Sprintf("the number %s at %s isn't finite", n.Value, d.path.where())), n.Value)
 		}
 		return f + 0, nil // + 0 turns -0 into 0.
 	default:

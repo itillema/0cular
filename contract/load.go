@@ -13,9 +13,11 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/itillema/0cular/internal/redact"
 	"github.com/itillema/0cular/internal/suggest"
 	"github.com/itillema/0cular/internal/yamlx"
 )
@@ -177,6 +179,7 @@ func (d *decoder) contract(root *yaml.Node) *Contract {
 		{name: "diffBudgets", decode: func(_, n *yaml.Node, path string) { c.DiffBudgets = d.diffBudgets(n, path) }},
 		{name: "consumerTests", refused: "consumer tests arrive in 0cular v0.3, and this build can't run them; remove them for now"},
 		{name: "rollout", refused: "rollouts arrive in 0cular v0.4, and this build can't run them; remove it for now"},
+		{name: "report", decode: func(key, n *yaml.Node, path string) { c.Report = d.report(key, n, path) }},
 		{name: "onFailure", decode: func(key, n *yaml.Node, path string) { d.onFailure(key, n, path, &c.OnFailure) }},
 	})
 	return c
@@ -700,6 +703,44 @@ func (d *decoder) budgetShape(item *yaml.Node, path string) {
 	default:
 		d.errorf(item, path, "set measure, a value to compare, or collection, a keyed list to compare")
 	}
+}
+
+func (d *decoder) report(key, n *yaml.Node, path string) Report {
+	var r Report
+	d.mapping(n, path, key, []field{
+		{name: "redact", decode: func(_, n *yaml.Node, path string) { r.Redact = d.redactPatterns(n, path) }},
+	})
+	return r
+}
+
+// redactPatterns checks report.redact: patterns of at most
+// MaxRedactPatternRunes characters, each with a letter, and none the same
+// as another once matching normalizes them.
+func (d *decoder) redactPatterns(n *yaml.Node, path string) []string {
+	var patterns []string
+	first := map[string]string{} // the path of the first pattern with each normalized form
+	d.list(n, path, func(item *yaml.Node, path string) {
+		s, ok := d.text(item, path)
+		if !ok {
+			return
+		}
+		normal := redact.Normalize(s)
+		switch {
+		case utf8.RuneCountInString(s) > MaxRedactPatternRunes:
+			d.errorf(item, path, "must be at most %d characters", MaxRedactPatternRunes)
+		case !redact.HasLetter(normal):
+			d.errorf(item, path, "must hold a letter: matching ignores everything but letters and digits")
+		case first[normal] != "":
+			d.errorf(item, path, "is the same pattern as %s, since matching ignores case and everything but letters and digits", first[normal])
+		default:
+			first[normal] = path
+			patterns = append(patterns, s)
+		}
+	})
+	if n.Kind == yaml.SequenceNode && len(n.Content) > MaxRedactPatterns {
+		d.errorf(n, path, "holds %d patterns; the limit is %d", len(n.Content), MaxRedactPatterns)
+	}
+	return patterns
 }
 
 func (d *decoder) onFailure(key, n *yaml.Node, path string, o *OnFailure) {

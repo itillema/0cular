@@ -170,7 +170,7 @@ Application metrics don't need a version label: a PromQL join on `zerocular_conf
 ## Security boundaries
 
 - **Least privilege.** Publishers can write blobs and the pointer, loaders only read through `Source`, and the promoter can write only the pointer.
-- **Untrusted artifacts.** Artifacts are size-capped and strictly decoded, nothing in them is executed, and every report escapes their contents.
+- **Untrusted artifacts.** Artifacts are size-capped and strictly decoded, nothing in them is executed, and every report escapes their contents and hides the values of fields that hold secrets (ADR-0015).
 - **Integrity.** The loader verifies the SHA-256 of every version it loads.
 - **Contracts are code.** They're reviewed and owned. Consumer-test commands come only from contracts, never from artifacts.
 

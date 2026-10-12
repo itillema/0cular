@@ -27,3 +27,4 @@ This directory records the decisions that shape 0cular: what was decided, why, a
 | [0012](0012-enforcing-the-dco.md) | Enforcing the DCO | Accepted |
 | [0013](0013-decode-and-schema-details.md) | Decode and schema validation details | Accepted |
 | [0014](0014-counting-cel-cost.md) | Counting the cost of CEL rules | Accepted |
+| [0015](0015-redacting-secrets-in-reports.md) | Redacting secrets in reports | Proposed |

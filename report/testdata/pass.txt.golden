@@ -1,0 +1,5 @@
+0cular check  quota-policies  candidate sha256:dd5600000000…  no baseline
+PASS
+  - budget     policy-count-stable       there's no baseline to compare with (skipped)
+  ✓ envelope   candidate                 512 B ≤ 1 MiB; valid YAML
+  ✓ invariant  every-policy-has-a-limit

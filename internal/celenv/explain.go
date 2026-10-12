@@ -20,6 +20,8 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 	"github.com/google/cel-go/interpreter"
 	"github.com/google/cel-go/parser"
+
+	"github.com/itillema/0cular/internal/redact"
 )
 
 // maxShownRunes bounds each value an explanation quotes, since values come
@@ -39,6 +41,10 @@ var comparisons = map[string]string{
 // flipped turns a comparison around, so `200 >= x` reads as `x <= 200`.
 var flipped = map[string]string{"==": "==", "!=": "!=", "<": ">", "<=": ">=", ">": "<", ">=": "<="}
 
+// Redact reports whether a field with this name holds a secret. A nil
+// Redact matches no field.
+type Redact func(field string) bool
+
 // Explain evaluates a boolean program again, recording every
 // subexpression's value, and describes why it returned false. It descends
 // through && to the operand that was false, through || to its last
@@ -48,9 +54,11 @@ var flipped = map[string]string{"==": "==", "!=": "!=", "<": ">", "<=": ">=", ">
 //	size(self.features) = 240, not <= 200
 //	fails for self.policies[3]: p.limit = null, not != null
 //
-// It returns "" if the program doesn't return false, or if it can't be
-// evaluated again within its limits.
-func (p *Program) Explain(ctx context.Context, vars map[string]any) (explanation string) {
+// It shows [redacted] in place of a value read through a field that redact
+// matches (ADR-0015), as ReadsRedacted decides, and of a map's entries for
+// such fields. It returns "" if the program doesn't return false, or if it
+// can't be evaluated again within its limits.
+func (p *Program) Explain(ctx context.Context, vars map[string]any, redact Redact) (explanation string) {
 	if p.tracking == nil {
 		return ""
 	}
@@ -70,7 +78,7 @@ func (p *Program) Explain(ctx context.Context, vars map[string]any) (explanation
 		return ""
 	}
 	native := p.ast.NativeRep()
-	x := &explainer{ctx: evalCtx, env: p.env, vars: vars, limits: p.limits, ast: native, state: details.State()}
+	x := &explainer{ctx: evalCtx, env: p.env, vars: vars, limits: p.limits, ast: native, state: details.State(), redact: redact}
 	return x.explain(native.Expr())
 }
 
@@ -82,6 +90,17 @@ type explainer struct {
 	limits Limits
 	ast    *ast.AST
 	state  interpreter.EvalState
+	redact Redact
+	// secret holds the loop variables that range over secret values.
+	secret map[string]bool
+}
+
+// show renders the value of e, or [redacted] if e reads a secret.
+func (x *explainer) show(e ast.Expr, v ref.Val) string {
+	if readsSecret(e, x.redact, x.secret) {
+		return redact.Marker
+	}
+	return Show(v, x.redact)
 }
 
 func (x *explainer) value(e ast.Expr) (ref.Val, bool) {
@@ -137,10 +156,10 @@ func (x *explainer) comparison(op string, left, right ast.Expr) string {
 	if !ok {
 		return ""
 	}
-	text := fmt.Sprintf("%s = %s, not %s %s", x.source(left), Show(lv), op, x.source(right))
+	text := fmt.Sprintf("%s = %s, not %s %s", x.source(left), x.show(left, lv), op, x.source(right))
 	if right.Kind() != ast.LiteralKind {
 		if rv, ok := x.value(right); ok {
-			text += " (" + Show(rv) + ")"
+			text += " (" + x.show(right, rv) + ")"
 		}
 	}
 	return text
@@ -188,6 +207,13 @@ func (x *explainer) all(e ast.Expr) string {
 	}
 	vars := maps.Clone(x.vars)
 	target := x.source(macro.AsCall().Target())
+	secret := maps.Clone(x.secret)
+	if readsSecret(comp.IterRange(), x.redact, x.secret) {
+		if secret == nil {
+			secret = map[string]bool{}
+		}
+		secret[comp.IterVar()] = true
+	}
 	i := 0
 	for it := iterable.Iterator(); it.HasNext() == types.True; i++ {
 		elem := it.Next()
@@ -205,25 +231,30 @@ func (x *explainer) all(e ast.Expr) string {
 		}
 		where := fmt.Sprintf("%s[%d]", target, i)
 		if _, isMap := rng.(traits.Mapper); isMap {
-			where = fmt.Sprintf("%s key %s", target, Show(elem))
+			key := Show(elem, x.redact)
+			if secret[comp.IterVar()] {
+				key = redact.Marker
+			}
+			where = fmt.Sprintf("%s key %s", target, key)
 		}
 		sub := *x
-		sub.vars, sub.ast, sub.state = vars, body.NativeRep(), details.State()
+		sub.vars, sub.ast, sub.state, sub.secret = vars, body.NativeRep(), details.State(), secret
 		return fmt.Sprintf("fails for %s: %s", where, sub.explain(sub.ast.Expr()))
 	}
 	return ""
 }
 
 // Show renders a CEL value for evidence, compactly and in JSON's syntax
-// where it has one, cut to maxShownRunes characters.
-func Show(v ref.Val) string {
+// where it has one, cut to maxShownRunes characters. A map's entries for
+// fields that redact matches show [redacted], at any depth.
+func Show(v ref.Val, redact Redact) string {
 	var b strings.Builder
-	writeValue(&b, v)
+	writeValue(&b, v, redact)
 	return cut(b.String(), maxShownRunes)
 }
 
 // writeValue writes v, stopping early once b holds more than it can show.
-func writeValue(b *strings.Builder, v ref.Val) {
+func writeValue(b *strings.Builder, v ref.Val, hide Redact) {
 	if b.Len() > 4*maxShownRunes {
 		return
 	}
@@ -248,7 +279,7 @@ func writeValue(b *strings.Builder, v ref.Val) {
 			if !first {
 				b.WriteString(", ")
 			}
-			writeValue(b, it.Next())
+			writeValue(b, it.Next(), hide)
 		}
 		b.WriteString("]")
 	case traits.Mapper:
@@ -256,7 +287,7 @@ func writeValue(b *strings.Builder, v ref.Val) {
 		for it := v.Iterator(); it.HasNext() == types.True; {
 			keys = append(keys, it.Next())
 		}
-		slices.SortFunc(keys, func(a, b ref.Val) int { return cmp.Compare(Show(a), Show(b)) })
+		slices.SortFunc(keys, func(a, b ref.Val) int { return cmp.Compare(Show(a, nil), Show(b, nil)) })
 		b.WriteString("{")
 		for i, k := range keys {
 			if b.Len() > 4*maxShownRunes {
@@ -265,9 +296,13 @@ func writeValue(b *strings.Builder, v ref.Val) {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			writeValue(b, k)
+			writeValue(b, k, hide)
 			b.WriteString(": ")
-			writeValue(b, v.Get(k))
+			if name, ok := k.(types.String); ok && hide != nil && hide(string(name)) {
+				b.WriteString(redact.Marker)
+				continue
+			}
+			writeValue(b, v.Get(k), hide)
 		}
 		b.WriteString("}")
 	default:
