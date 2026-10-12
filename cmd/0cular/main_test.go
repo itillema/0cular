@@ -90,6 +90,33 @@ func TestBinaryVersion(t *testing.T) {
 	}
 }
 
+func TestBinaryContractLint(t *testing.T) {
+	dir := lintTestFiles(t)
+	for name, wantCode := range map[string]int{
+		"clean.yaml":   exitPass,
+		"warning.yaml": exitPass,
+		"error.yaml":   exitBlock,
+		"invalid.yaml": exitBlock,
+		"missing.yaml": exitUsage,
+	} {
+		ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+		//nolint:gosec // G204: binary is this test's own build, and the file is one this test wrote.
+		out, err := exec.CommandContext(ctx, binary, "contract", "lint", filepath.Join(dir, name)).CombinedOutput()
+		cancel()
+		code := 0
+		if err != nil {
+			var exitErr *exec.ExitError
+			if !errors.As(err, &exitErr) {
+				t.Fatalf("running 0cular: %v", err)
+			}
+			code = exitErr.ExitCode()
+		}
+		if code != wantCode {
+			t.Errorf("0cular contract lint %s exited with %d, want %d; output:\n%s", name, code, wantCode, out)
+		}
+	}
+}
+
 func TestBinaryContractSchema(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()

@@ -8,7 +8,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
@@ -330,30 +329,18 @@ func TestUniqueIsLinear(t *testing.T) {
 	}
 }
 
-// sizeEstimator tells the static cost estimator that every list holds
-// size elements.
-type sizeEstimator struct{ size uint64 }
-
-func (s sizeEstimator) EstimateSize(checker.AstNode) *checker.SizeEstimate {
-	return &checker.SizeEstimate{Min: 0, Max: s.size}
-}
-
-func (sizeEstimator) EstimateCallCost(string, string, *checker.AstNode, []checker.AstNode) *checker.CallEstimate {
-	return nil
-}
-
 func TestUniqueStaticCost(t *testing.T) {
 	env := newEnv(t, Rules, Limits{})
 	prg, err := env.Compile("zerocular.unique(self.ids)", Bool)
 	if err != nil {
 		t.Fatal(err)
 	}
-	estimate, err := env.env.EstimateCost(prg.ast, sizeEstimator{size: 5000})
+	estimate, err := prg.EstimateCost(func(Value) uint64 { return 5000 })
 	if err != nil {
 		t.Fatal(err)
 	}
-	if estimate.Max < 5000 || estimate.Max > 10_000 {
-		t.Errorf("estimated cost = %+v, want it linear in a 5000-element list", estimate)
+	if estimate < 5000 || estimate > 10_000 {
+		t.Errorf("estimated cost = %d, want it linear in a 5000-element list", estimate)
 	}
 }
 

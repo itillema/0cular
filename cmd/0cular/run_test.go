@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -27,6 +29,7 @@ func TestRun(t *testing.T) {
 		{name: "contract schema", args: []string{"contract", "schema"}, wantCode: exitPass, wantStdout: `"title": "0cular contract"`},
 		{name: "contract without a subcommand", args: []string{"contract"}, wantCode: exitUsage, wantStderr: "Usage:"},
 		{name: "unknown contract subcommand", args: []string{"contract", "nope"}, wantCode: exitUsage, wantStderr: `unknown command "nope" for "0cular contract"`},
+		{name: "contract lint without files", args: []string{"contract", "lint"}, wantCode: exitUsage, wantStderr: "requires at least 1 arg(s), only received 0"},
 		{
 			name:       "contract schema with an argument",
 			args:       []string{"contract", "schema", "extra"},
@@ -41,6 +44,95 @@ func TestRun(t *testing.T) {
 				t.Errorf("run(%q) = %d, want %d", tt.args, got, tt.wantCode)
 			}
 			checkOutput(t, "stdout", stdout.String(), tt.wantStdout)
+			checkOutput(t, "stderr", stderr.String(), tt.wantStderr)
+		})
+	}
+}
+
+// lintTestFiles writes contract files for the contract lint tests into a
+// temporary directory, and returns its path.
+func lintTestFiles(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	header := "apiVersion: 0cular/v1alpha1\nkind: Contract\nmetadata: {name: lint}\nartifact: {format: json, maxBytes: 1MiB}\n"
+	for name, body := range map[string]string{
+		"clean.yaml":   "invariants:\n  - {name: capped, expr: \"size(self.features) <= 200\"}\n",
+		"warning.yaml": "invariants:\n  - {name: next, expr: \"self.version + 1 > 2.0\"}\n",
+		"error.yaml":   "invariants:\n  - {name: positive, expr: \"self.policies.all(p, p.limit > 0)\"}\n",
+		"invalid.yaml": "invariants:\n  - {name: bad, exprr: \"true\"}\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(header+body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+func TestContractLint(t *testing.T) {
+	dir := lintTestFiles(t)
+	file := func(name string) string { return filepath.Join(dir, name) }
+	tests := []struct {
+		name       string
+		files      []string
+		wantCode   int
+		wantStdout []string // substrings; none means stdout must be empty
+		wantStderr string   // a substring; empty means stderr must be empty
+	}{
+		{name: "a clean contract", files: []string{"clean.yaml"}, wantCode: exitPass},
+		{
+			name:       "a warning",
+			files:      []string{"warning.yaml"},
+			wantCode:   exitPass,
+			wantStdout: []string{"warning.yaml:6:24: warning: invariants[0].expr: at 1:14 in the expression: self.version + 1 fails when it runs"},
+		},
+		{
+			name:       "an error",
+			files:      []string{"error.yaml"},
+			wantCode:   exitBlock,
+			wantStdout: []string{"error.yaml:6:28: error: invariants[0].expr: it could cost up to 2,621,442"},
+		},
+		{
+			name:     "a contract that doesn't load",
+			files:    []string{"invalid.yaml"},
+			wantCode: exitBlock,
+			wantStdout: []string{
+				"invalid.yaml:6:5: error: invariants[0]: missing required field expr",
+				"invalid.yaml:6:17: error: invariants[0].exprr: unknown field; did you mean expr?",
+			},
+		},
+		{
+			name:       "a file that can't be read",
+			files:      []string{"clean.yaml", "missing.yaml", "error.yaml"},
+			wantCode:   exitUsage,
+			wantStdout: []string{"error.yaml:6:28: error:"},
+			wantStderr: "0cular: read contract: open " + file("missing.yaml"),
+		},
+		{
+			name:       "several files",
+			files:      []string{"warning.yaml", "clean.yaml", "invalid.yaml"},
+			wantCode:   exitBlock,
+			wantStdout: []string{"warning.yaml:6:24: warning:", "invalid.yaml:6:5: error:", "invalid.yaml:6:17: error:"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := []string{"contract", "lint"}
+			for _, f := range tt.files {
+				args = append(args, file(f))
+			}
+			var stdout, stderr bytes.Buffer
+			if got := run(t.Context(), args, &stdout, &stderr); got != tt.wantCode {
+				t.Errorf("run(contract lint %q) = %d, want %d", tt.files, got, tt.wantCode)
+			}
+			if len(tt.wantStdout) == 0 {
+				checkOutput(t, "stdout", stdout.String(), "")
+			}
+			for _, want := range tt.wantStdout {
+				checkOutput(t, "stdout", stdout.String(), want)
+			}
+			if got := strings.Count(stdout.String(), "\n"); got != len(tt.wantStdout) {
+				t.Errorf("stdout has %d lines, want %d:\n%s", got, len(tt.wantStdout), stdout.String())
+			}
 			checkOutput(t, "stderr", stderr.String(), tt.wantStderr)
 		})
 	}

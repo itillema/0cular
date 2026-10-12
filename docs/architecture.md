@@ -180,8 +180,8 @@ See [SECURITY.md](../SECURITY.md) to report a vulnerability.
 
 ```text
 cmd/0cular/   the CLI
-contract/     contract types, strict loading, lint (v0.1)
-eval/         decoding, schema, CEL invariants, budgets (v0.1)
+contract/     contract types and strict loading (v0.1)
+eval/         decoding, schema, CEL invariants, budgets and lint (v0.1)
 gate/         the check API and approvals (v0.1)
 report/       text, Markdown and JSON reports (v0.1)
 action/       the GitHub Action (v0.1)

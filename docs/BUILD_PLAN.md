@@ -13,7 +13,7 @@ How the plan is kept:
 | --- | --- |
 | Current phase | Phase 1 — v0.1 "Check": in progress |
 | Last updated | 2026-10-12 |
-| Next task | 1.1 `contract lint`. Done so far: 1.2 `eval`, and in 1.1, types, strict loading and the contract JSON Schema |
+| Next task | 1.3 `report`: text, Markdown and JSON renderers, with escaping golden tests. Done so far: 1.1 `contract` and 1.2 `eval` |
 | Blocked on | The maintainer's review of the work since Phase 1 began |
 | Latest release | None |
 | Planned releases | v0.1 Check, v0.2 Keep, v0.3 Publish, v0.4 Rings |
@@ -158,7 +158,7 @@ It complements Argo Rollouts and Flagger (pods), flag tools (per-user flags) and
 - `self` (the candidate), `baseline` (or `null` under `--no-baseline`) and `meta` (`bytes`, `sha256`, `format`, `key`).
 - Standard CEL plus the cel-go string, list, set and math extensions, each pinned to a version (for example `ext.Strings(ext.StringsVersion(N))`) so cel-go upgrades don't change behavior. `cel.CrossTypeNumericComparisons(true)` lets `self.limit > 0` compare a double with an int.
 - `zerocular.unique(list)`: a linear-time uniqueness check, written in Go with a hash set (Appendix A shows why). The `zerocular` namespace is the letter-first form of the name (ADR-0001).
-- **Limits:** a runtime cost limit (default 1,000,000) and a 2 s timeout per expression, both configurable downward only. 0cular counts the runtime cost itself, in linear time, because cel-go's cost tracker is quadratic over long lists; the same counter checks the timeout every 100 steps, since cost alone doesn't bound time (ADR-0014). `contract lint` also rejects an expression whose static estimate (`env.EstimateCost`, with sizes from `artifact.maxBytes` and the schema's `maxItems` and `maxLength`) exceeds the ceiling.
+- **Limits:** a runtime cost limit (default 1,000,000) and a 2 s timeout per expression, both configurable downward only. 0cular counts the runtime cost itself, in linear time, because cel-go's cost tracker is quadratic over long lists; the same counter checks the timeout every 100 steps, since cost alone doesn't bound time (ADR-0014). `contract lint` also rejects an expression whose static estimate (`env.EstimateCost`, with sizes from the schema's `maxItems`, `maxProperties` and `maxLength`, or else from `artifact.maxBytes` and `artifact.maxNodes`) exceeds the ceiling, and names the value to bound.
 
 **Measure budgets** evaluate `measure` on the candidate and on the baseline:
 
@@ -172,7 +172,7 @@ diffBudgets:
     maxChangePct: 50
 ```
 
-Supported limits: `maxChangePct`, `maxIncrease`, `maxDecrease`. Budgets bound only change against the baseline. Absolute limits are invariants, and lint rejects `minValue` and `maxValue` in a budget:
+A budget evaluates its measure on each version in turn, as `self`, so `baseline` is null there, and lint rejects a measure or collection that reads it. Supported limits: `maxChangePct`, `maxIncrease`, `maxDecrease`. Budgets bound only change against the baseline. Absolute limits are invariants, and lint rejects `minValue` and `maxValue` in a budget:
 
 ```yaml
 invariants:
@@ -589,7 +589,7 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
 
 **Goal:** block bad config before it ships.
 
-- [ ] 1.1 `contract`:
+- [x] 1.1 `contract`:
   - types and strict YAML loading (unknown fields are errors);
   - a published JSON Schema for contract files;
   - `contract lint` with helpful messages and the lint rules in §3.2–3.3: CEL type errors at the expression, static cost, `onFailure` values, budget limits, int-literal arithmetic.

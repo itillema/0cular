@@ -156,15 +156,7 @@ type compiledInvariant struct {
 // compile is a problem with the contract: New returns a *contract.Error
 // that places each problem in the contract file.
 func New(c *contract.Contract) (*Evaluator, error) {
-	env, err := celenv.New(celenv.Rules, celenv.Limits{})
-	if err != nil {
-		return nil, err
-	}
-	keys, err := celenv.New(celenv.Keys, celenv.Limits{})
-	if err != nil {
-		return nil, err
-	}
-	items, err := celenv.New(celenv.Items, celenv.Limits{})
+	env, err := newEnvs()
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +168,7 @@ func New(c *contract.Contract) (*Evaluator, error) {
 	e := &Evaluator{contract: c, schema: schema}
 	for i, inv := range c.Invariants {
 		path := fmt.Sprintf("invariants[%d].expr", i)
-		program, err := env.Compile(inv.Expr, celenv.Bool)
+		program, err := env.rules.Compile(inv.Expr, celenv.Bool)
 		if err != nil {
 			problems = append(problems, expressionProblems(c, path, err)...)
 			continue
@@ -184,7 +176,7 @@ func New(c *contract.Contract) (*Evaluator, error) {
 		e.invariants = append(e.invariants, compiledInvariant{Invariant: inv, program: program})
 	}
 	for i, b := range c.DiffBudgets {
-		budget, budgetProblems := compileBudget(c, i, b, envs{rules: env, keys: keys, items: items})
+		budget, budgetProblems := compileBudget(c, i, b, env)
 		problems = append(problems, budgetProblems...)
 		e.budgets = append(e.budgets, budget)
 	}
@@ -206,13 +198,18 @@ func expressionProblems(c *contract.Contract, path string, err error) []contract
 	}
 	problems := make([]contract.Problem, len(ce.Problems))
 	for i, p := range ce.Problems {
-		message := strings.TrimSuffix(p.Message, " (in container '')")
-		if p.Line > 0 {
-			message = fmt.Sprintf("at %d:%d in the expression: %s", p.Line, p.Column, message)
-		}
-		problems[i] = contract.Problem{Pos: c.Position(path), Path: path, Message: message}
+		problems[i] = contract.Problem{Pos: c.Position(path), Path: path, Message: inExpression(p)}
 	}
 	return problems
+}
+
+// inExpression returns a problem's message, after its place in the
+// expression when it has one.
+func inExpression(p celenv.Problem) string {
+	if p.Line > 0 {
+		return fmt.Sprintf("at %d:%d in the expression: %s", p.Line, p.Column, p.Message)
+	}
+	return p.Message
 }
 
 // Check checks candidate against the contract, and against baseline when

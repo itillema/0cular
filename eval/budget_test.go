@@ -297,7 +297,7 @@ func TestNewReportsBudgetProblems(t *testing.T) {
 	want := []string{
 		"budgets.yaml:9:30: diffBudgets[0].measure: the expression returns a string, but it must return a number",
 		"budgets.yaml:10:36: diffBudgets[1].collection: the expression returns a number (int), but it must return a list",
-		"budgets.yaml:11:46: diffBudgets[2].key: at 1:1 in the expression: undeclared reference to 'self'",
+		"budgets.yaml:11:46: diffBudgets[2].key: at 1:1 in the expression: undeclared reference to 'self'; a key reads only item, the element it identifies",
 	}
 	if err == nil || err.Error() != strings.Join(want, "\n") {
 		t.Errorf("New() error =\n%v\nwant:\n%s", err, strings.Join(want, "\n"))

@@ -16,6 +16,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/itillema/0cular/internal/suggest"
 	"github.com/itillema/0cular/internal/yamlx"
 )
 
@@ -264,7 +265,7 @@ func (d *decoder) mapping(n *yaml.Node, path string, at *yaml.Node, fields []fie
 		j := slices.IndexFunc(fields, func(f field) bool { return f.name == name })
 		switch {
 		case j < 0:
-			d.errorf(key, keyPath, "unknown field%s", suggest(name, fields))
+			d.errorf(key, keyPath, "unknown field%s", fieldHint(name, fields))
 		case fields[j].refused != "":
 			d.errorf(key, keyPath, "%s", fields[j].refused)
 		default:
@@ -732,50 +733,20 @@ func (d *decoder) onFailure(key, n *yaml.Node, path string, o *OnFailure) {
 	})
 }
 
-// suggest returns a hint for an unknown key: the closest field name, or
+// fieldHint returns a hint for an unknown key: the closest field name, or
 // the list of fields.
-func suggest(name string, fields []field) string {
+func fieldHint(name string, fields []field) string {
 	var names []string
 	for _, f := range fields {
 		if f.refused == "" {
 			names = append(names, f.name)
 		}
 	}
-	if len(name) <= 64 {
-		best, bestDistance := "", 3
-		for _, f := range names {
-			if dist := distance(strings.ToLower(name), strings.ToLower(f)); dist < bestDistance {
-				best, bestDistance = f, dist
-			}
-		}
-		if best != "" {
-			return "; did you mean " + best + "?"
-		}
+	if best, ok := suggest.Closest(name, names); ok {
+		return "; did you mean " + best + "?"
 	}
 	if len(names) == 1 {
 		return "; the only field here is " + names[0]
 	}
 	return "; the fields here are " + strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
-}
-
-// distance returns the Levenshtein distance between a and b.
-func distance(a, b string) int {
-	ra, rb := []rune(a), []rune(b)
-	prev := make([]int, len(rb)+1)
-	cur := make([]int, len(rb)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-	for i := 1; i <= len(ra); i++ {
-		cur[0] = i
-		for j := 1; j <= len(rb); j++ {
-			cost := 1
-			if ra[i-1] == rb[j-1] {
-				cost = 0
-			}
-			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
-		}
-		prev, cur = cur, prev
-	}
-	return prev[len(rb)]
 }

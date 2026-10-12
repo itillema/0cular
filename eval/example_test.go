@@ -70,6 +70,32 @@ func ExampleDecode_yaml() {
 	// "yes" 777 "2026-10-11"
 }
 
+func ExampleLint() {
+	c, err := contract.Parse([]byte(`apiVersion: 0cular/v1alpha1
+kind: Contract
+metadata: {name: quota-policies}
+artifact: {format: json, maxBytes: 1MiB}
+invariants:
+  - {name: positive-limits, expr: "self.policies.all(p, p.limit > 0)"}
+  - {name: next-version, expr: "self.version + 1 > 1.0"}
+`))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	findings, err := eval.Lint(c)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	for _, f := range findings {
+		fmt.Println(f)
+	}
+	// Output:
+	// 6:35: error: invariants[0].expr: it could cost up to 2,621,442 on an artifact this contract allows, over the cost limit of 1,000,000: it loops over self.policies, which could hold up to 524,288 items; bound it with maxItems or maxProperties in a JSON Schema (schema.jsonSchema), or lower artifact.maxBytes
+	// 7:32: warning: invariants[1].expr: at 1:14 in the expression: self.version + 1 fails when it runs: numbers from the artifact are doubles, and 1 is an int; write 1.0
+}
+
 func ExampleEvaluator_Check() {
 	c, err := contract.Parse([]byte(`apiVersion: 0cular/v1alpha1
 kind: Contract

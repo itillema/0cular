@@ -19,7 +19,7 @@ Postmortem: [Google Cloud Service Control incident report, June 12, 2025](https:
 | `baseline.yaml` | Eight quota policies, each with a limit and a period |
 | `candidate.yaml` | The same policies plus a new one whose `limit:` is blank, which YAML reads as null |
 | `consumer/` | A stub that derives each policy's per-second rate and dereferences the limit without checking for null |
-| `schema.json` | The file's shape. Like a nullable column, it lets a limit be null |
+| `schema.json` | The file's shape. Like a nullable column, it lets a limit be null. Its cap of 1,000 policies is ours, and lets `contract lint` prove the invariant stays within its cost limit |
 | `contract.yaml` | The contract that would have caught it |
 | `expected.yaml` | The expected outcome at each stage |
 

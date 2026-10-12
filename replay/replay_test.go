@@ -18,6 +18,9 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"go.yaml.in/yaml/v3"
+
+	"github.com/itillema/0cular/contract"
+	"github.com/itillema/0cular/eval"
 )
 
 // requiredScenarios are the scenarios that must exist. A scenario is added
@@ -305,6 +308,25 @@ func TestScenarioSchemas(t *testing.T) {
 
 // TestConsumerStubs proves that each consumer stub exits 0 on its baseline
 // and fails on its candidate in the way expected.yaml records.
+// TestContractsLint checks that every scenario's contract passes contract
+// lint without a finding, since the scenarios show how to write one.
+func TestContractsLint(t *testing.T) {
+	for _, s := range loadScenarios(t) {
+		c, err := contract.LoadFile(filepath.Join(s.name, "contract.yaml"))
+		if err != nil {
+			t.Errorf("%s: %v", s.name, err)
+			continue
+		}
+		findings, err := eval.Lint(c)
+		if err != nil {
+			t.Fatalf("%s: Lint() error = %v", s.name, err)
+		}
+		for _, f := range findings {
+			t.Errorf("%s/contract.yaml:%s", s.name, f)
+		}
+	}
+}
+
 func TestConsumerStubs(t *testing.T) {
 	for _, s := range loadScenarios(t) {
 		t.Run(s.name, func(t *testing.T) {

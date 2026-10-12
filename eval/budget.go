@@ -38,8 +38,8 @@ type compiledBudget struct {
 	measure *celenv.Program
 	// collection evaluates a collection budget's collection, and keys
 	// evaluates its elements' keys, in one evaluation rather than one per
-	// element.
-	collection, keys *celenv.Program
+	// element. key is the key alone, which Lint checks.
+	collection, keys, key *celenv.Program
 }
 
 // envs are the CEL environments a contract's expressions compile in.
@@ -47,9 +47,27 @@ type envs struct {
 	rules, keys, items *celenv.Env
 }
 
+// newEnvs returns the environments, with the default limits.
+func newEnvs() (envs, error) {
+	rules, err := celenv.New(celenv.Rules, celenv.Limits{})
+	if err != nil {
+		return envs{}, err
+	}
+	keys, err := celenv.New(celenv.Keys, celenv.Limits{})
+	if err != nil {
+		return envs{}, err
+	}
+	items, err := celenv.New(celenv.Items, celenv.Limits{})
+	if err != nil {
+		return envs{}, err
+	}
+	return envs{rules: rules, keys: keys, items: items}, nil
+}
+
 // compileBudget compiles a budget's expressions. A collection's key is
 // compiled alone too, in an environment with only item, so that it can't
-// read anything else.
+// read anything else. The budget holds every expression that compiled, for
+// Lint, even when another didn't.
 func compileBudget(c *contract.Contract, i int, b contract.DiffBudget, env envs) (compiledBudget, []contract.Problem) {
 	path := fmt.Sprintf("diffBudgets[%d]", i)
 	cb := compiledBudget{DiffBudget: b}
@@ -66,19 +84,21 @@ func compileBudget(c *contract.Contract, i int, b contract.DiffBudget, env envs)
 	if err != nil {
 		problems = append(problems, expressionProblems(c, path+".collection", err)...)
 	}
-	if _, err := env.keys.Compile(b.Key, celenv.Any); err != nil {
+	key, err := env.keys.Compile(b.Key, celenv.Any)
+	if err != nil {
 		problems = append(problems, expressionProblems(c, path+".key", err)...)
 	}
+	cb.collection, cb.key = collection, key
 	if len(problems) > 0 {
 		return cb, problems
 	}
 	// The key compiled alone above, where only item exists. The line break
 	// ends any comment at the end of it.
-	keyList, err := env.items.Compile("items.map(item, "+b.Key+"\n)", celenv.List)
+	keys, err := env.items.Compile("items.map(item, "+b.Key+"\n)", celenv.List)
 	if err != nil {
 		return cb, expressionProblems(c, path+".key", err)
 	}
-	cb.collection, cb.keys = collection, keyList
+	cb.keys = keys
 	return cb, nil
 }
 
