@@ -24,6 +24,15 @@ func TestRun(t *testing.T) {
 		{name: "unknown command", args: []string{"nope"}, wantCode: exitUsage, wantStderr: `unknown command "nope"`},
 		{name: "unknown flag", args: []string{"--nope"}, wantCode: exitUsage, wantStderr: "unknown flag: --nope"},
 		{name: "extra argument", args: []string{"version", "extra"}, wantCode: exitUsage, wantStderr: `unknown command "extra" for "0cular version"`},
+		{name: "contract schema", args: []string{"contract", "schema"}, wantCode: exitPass, wantStdout: `"title": "0cular contract"`},
+		{name: "contract without a subcommand", args: []string{"contract"}, wantCode: exitUsage, wantStderr: "Usage:"},
+		{name: "unknown contract subcommand", args: []string{"contract", "nope"}, wantCode: exitUsage, wantStderr: `unknown command "nope" for "0cular contract"`},
+		{
+			name:       "contract schema with an argument",
+			args:       []string{"contract", "schema", "extra"},
+			wantCode:   exitUsage,
+			wantStderr: `unknown command "extra" for "0cular contract schema"`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

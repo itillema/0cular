@@ -41,17 +41,20 @@ func newRootCommand(stdout, stderr io.Writer) *cobra.Command {
 			"rings with automatic revert.",
 		SilenceErrors: true,
 		SilenceUsage:  true,
-		// Without a command there's nothing to do: show the usage and fail.
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			fmt.Fprint(cmd.ErrOrStderr(), cmd.UsageString())
-			return &exitError{code: exitUsage}
-		},
+		RunE:          showUsage,
 	}
 	root.SetOut(stdout)
 	root.SetErr(stderr)
-	root.AddCommand(newVersionCommand())
+	root.AddCommand(newVersionCommand(), newContractCommand())
 	tagCommandErrors(root)
 	return root
+}
+
+// showUsage is the RunE of a command that only groups other commands. Run on
+// its own, there's nothing for it to do, so it shows the usage and fails.
+func showUsage(cmd *cobra.Command, _ []string) error {
+	fmt.Fprint(cmd.ErrOrStderr(), cmd.UsageString())
+	return &exitError{code: exitUsage}
 }
 
 // tagCommandErrors wraps the RunE of cmd and of every subcommand so that each

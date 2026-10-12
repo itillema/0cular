@@ -11,10 +11,10 @@ How the plan is kept:
 
 | Field | Value |
 | --- | --- |
-| Current phase | Phase 0 — Foundations: complete |
-| Last updated | 2026-10-11 |
-| Next task | Phase 1, task 1.1 `contract`, once the maintainer starts Phase 1 |
-| Blocked on | The maintainer's go-ahead for Phase 1 |
+| Current phase | Phase 1 — v0.1 "Check": in progress |
+| Last updated | 2026-10-12 |
+| Next task | 1.1 `contract lint`. Done so far: 1.2 `eval`, and in 1.1, types, strict loading and the contract JSON Schema |
+| Blocked on | The maintainer's review of the work since Phase 1 began |
 | Latest release | None |
 | Planned releases | v0.1 Check, v0.2 Keep, v0.3 Publish, v0.4 Rings |
 | Design partners | None yet (target: 1 by the end of Phase 1) |
@@ -145,9 +145,9 @@ It complements Argo Rollouts and Flagger (pods), flag tools (per-user flags) and
 | `apiVersion`, `kind`, `metadata.name` | string | `0cular/v1alpha1`, `Contract`, unique artifact name |
 | `artifact.format` | enum | `json` and `yaml` in v0.1; `toml`, `csv` and `bytes` (size and hash only) later |
 | `artifact.maxBytes` | size | Hard cap; checked before parsing |
-| `artifact.maxDepth`, `artifact.maxNodes` | int | Decode caps (§3.3); defaults 64 and 1,000,000 |
+| `artifact.maxDepth`, `artifact.maxNodes` | int | Decode caps (§3.3); defaults 64 and 1,000,000. `maxDepth` is at most 10,000, the deepest nesting the parsers read |
 | `artifact.csv` | object | `delimiter`, `maxRows` (CSV only, later) |
-| `schema.jsonSchema` | path | Draft 2020-12 schema; applied after decoding |
+| `schema.jsonSchema` | path | Draft 2020-12 schema; applied after decoding. One self-contained file, with formats asserted (ADR-0013) |
 | `invariants[]` | list | `name`, `expr` (CEL → bool), `message`; always BLOCK on false or error. Absolute limits go here |
 | `diffBudgets[]` | list | Measure and collection budgets on change against the baseline; NEEDS_APPROVAL on breach unless `overridable: false` |
 | `consumerTests[]` (v0.3) | list | `name`, `run` (argv), `container`, `sandbox`, `env`, `timeout`, `expectExit`, optional `replay` |
@@ -158,7 +158,7 @@ It complements Argo Rollouts and Flagger (pods), flag tools (per-user flags) and
 - `self` (the candidate), `baseline` (or `null` under `--no-baseline`) and `meta` (`bytes`, `sha256`, `format`, `key`).
 - Standard CEL plus the cel-go string, list, set and math extensions, each pinned to a version (for example `ext.Strings(ext.StringsVersion(N))`) so cel-go upgrades don't change behavior. `cel.CrossTypeNumericComparisons(true)` lets `self.limit > 0` compare a double with an int.
 - `zerocular.unique(list)`: a linear-time uniqueness check, written in Go with a hash set (Appendix A shows why). The `zerocular` namespace is the letter-first form of the name (ADR-0001).
-- **Limits:** a runtime cost limit (default 1,000,000) and a 2 s timeout per expression, both configurable downward only. The timeout uses `prg.ContextEval(ctx, vars)` with `cel.InterruptCheckFrequency(n)`, since cost tracking alone doesn't bound time. `contract lint` also rejects an expression whose static estimate (`env.EstimateCost`, with sizes from `artifact.maxBytes` and the schema's `maxItems` and `maxLength`) exceeds the ceiling.
+- **Limits:** a runtime cost limit (default 1,000,000) and a 2 s timeout per expression, both configurable downward only. 0cular counts the runtime cost itself, in linear time, because cel-go's cost tracker is quadratic over long lists; the same counter checks the timeout every 100 steps, since cost alone doesn't bound time (ADR-0014). `contract lint` also rejects an expression whose static estimate (`env.EstimateCost`, with sizes from `artifact.maxBytes` and the schema's `maxItems` and `maxLength`) exceeds the ceiling.
 
 **Measure budgets** evaluate `measure` on the candidate and on the baseline:
 
@@ -189,8 +189,10 @@ invariants:
     key: item.id                       # identity per element
     maxRemoved: 5
     maxAdded: 50
-    maxChangedPct: 10
+    maxChangedPct: 10                  # changed / max(baseline items, 1) × 100
 ```
+
+Items match by key, as CEL's `==` compares keys, and an item is changed when both lists hold its key but `==` says the items differ. Two items with the same key make the budget an error, because neither can be matched with confidence. Budgets with the same `collection` and `key` share one diff.
 
 **Consumer tests (v0.3)** run the real consumer against the candidate:
 
@@ -206,7 +208,8 @@ consumerTests:
 ### 3.3 Evaluation semantics
 
 **Canonical decode model**, the same for every format (full rules in `docs/contract-spec.md`):
-- Numbers are CEL `double` (integers above 2^53 lose precision). Lint warns on int-literal arithmetic: write `self.x + 1.0`, not `self.x + 1`.
+- Numbers are CEL `double`. An integer literal beyond ±(2^53 − 1), which a double can't hold exactly, is a decode error, so large IDs must be quoted (ADR-0013). Lint warns on int-literal arithmetic: write `self.x + 1.0`, not `self.x + 1`.
+- What parsers read differently is a decode error: in JSON, duplicate keys and lone surrogate escapes (I-JSON, RFC 7493); in YAML, tags, merge keys and the characters U+0085, U+2028 and U+2029 (ADR-0013).
 - Datetimes stay RFC 3339 strings, with no YAML timestamp conversion. Map keys must be strings; any other key is a decode error.
 - CSV (later) needs a header row and decodes to a list of maps keyed by it, with string values.
 - Caps on nesting depth (default 64), nodes after YAML alias expansion (default 1,000,000) and YAML aliases (100 per document) stop billion-laughs inputs.
@@ -590,7 +593,7 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
   - types and strict YAML loading (unknown fields are errors);
   - a published JSON Schema for contract files;
   - `contract lint` with helpful messages and the lint rules in §3.2–3.3: CEL type errors at the expression, static cost, `onFailure` values, budget limits, int-literal arithmetic.
-- [ ] 1.2 `eval`:
+- [x] 1.2 `eval`:
   - the decode model for JSON and YAML, with its caps (§3.3), and JSON Schema;
   - CEL invariants with cost limits, `ContextEval` timeouts, pinned extensions and `zerocular.unique`;
   - measure and collection budgets, and deterministic results.
@@ -746,7 +749,7 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
 
 - **Versioning:** SemVer, with 0.x until contract spec v1. Contract `apiVersion` changes follow a written deprecation policy.
 - **Releases:** release-please (Go release type), driven by Conventional Commits, and GoReleaser run in one workflow; the GoReleaser job runs only when `release_created` is true (§4). It produces binaries, a GHCR image, checksums, cosign keyless signatures, SLSA provenance and a syft SBOM. The Homebrew tap is optional.
-- **Sign-off (DCO, ADR-0010):** every commit is signed off with `git commit -s`, and a DCO check runs in CI on every pull request.
+- **Sign-off (DCO, ADR-0010):** every commit is signed off with `git commit -s`, and a DCO check runs in CI on every pull request. It's required on `dev`, where every change enters, and a sign-off missing from a merged commit is added with a remediation commit, never by rewriting history (ADR-0012).
 - **Branches and environments (ADR-0011):** `main` (production), `uat`, `qa` and `dev` are permanent. Work branches off `dev` and is promoted `dev` → `qa` → `uat` → `main`; a `hotfix/*` branch goes into `uat`. The `branch-flow` check enforces the order, and rulesets keep the four branches from being deleted or force-pushed.
 - **Repo hygiene:** branch protection with required checks, Dependabot and a Scorecard badge.
 - **Docs:**
