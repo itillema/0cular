@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/itillema/0cular/contract"
 )
 
 // binary is the path of the 0cular binary that TestMain builds, so the tests
@@ -51,6 +54,8 @@ func TestBinaryExitCodes(t *testing.T) {
 		{name: "unknown command", args: []string{"nope"}, wantCode: exitUsage},
 		{name: "unknown flag", args: []string{"--nope"}, wantCode: exitUsage},
 		{name: "extra argument", args: []string{"version", "extra"}, wantCode: exitUsage},
+		{name: "contract schema", args: []string{"contract", "schema"}, wantCode: exitPass},
+		{name: "contract without a subcommand", args: []string{"contract"}, wantCode: exitUsage},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -82,5 +87,17 @@ func TestBinaryVersion(t *testing.T) {
 	}
 	if !strings.HasPrefix(string(out), "0cular ") || !strings.Contains(string(out), "go:       go") {
 		t.Errorf("0cular version printed %q, want the version, Go version and platform", out)
+	}
+}
+
+func TestBinaryContractSchema(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, binary, "contract", "schema").Output()
+	if err != nil {
+		t.Fatalf("0cular contract schema: %v", err)
+	}
+	if !bytes.Equal(out, contract.JSONSchema()) {
+		t.Errorf("0cular contract schema printed %d bytes that differ from the embedded schema (%d bytes)", len(out), len(contract.JSONSchema()))
 	}
 }
