@@ -44,7 +44,7 @@ go test ./replay/...  # the replay suite alone
 - `just check` must pass.
 - Add tests with every change, and update the docs when behavior changes.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages (`feat:`, `fix:`, `docs:`, `test:`, `build:`, `ci:`, `chore:`, `refactor:`). Release notes are generated from them.
-- Sign off every commit (see below). A DCO check runs on every pull request.
+- Sign off every commit (see below). A DCO check runs on every pull request, and a pull request into `dev` can't merge until it passes.
 
 ## Developer Certificate of Origin
 
@@ -54,7 +54,7 @@ By signing off a commit, you certify the [Developer Certificate of Origin](https
 Signed-off-by: Your Name <you@example.com>
 ```
 
-The name and email must match the commit's author. To sign off commits you've already made, run `git rebase --signoff <base>`.
+The name and email must match the commit's author. To sign off commits you've already made, run `git rebase --signoff <base>`. Once a commit has merged, don't rewrite the branch: add an empty, signed-off remediation commit instead, as [ADR-0012](docs/adr/0012-enforcing-the-dco.md) describes.
 
 ## Replay scenarios
 
