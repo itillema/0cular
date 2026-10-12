@@ -1,6 +1,6 @@
 # ADR-0003: Contract language: CEL and JSON Schema
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by [ADR-0014](0014-counting-cel-cost.md), which changes how the runtime cost is counted
 - **Date:** 2026-10-10
 
 ## Context

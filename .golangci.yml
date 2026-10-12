@@ -3,6 +3,7 @@ version: "2"
 linters:
   default: standard
   enable:
+    - depguard
     - errorlint
     - forbidigo
     - gosec
@@ -10,6 +11,27 @@ linters:
     - nolintlint
     - revive
   settings:
+    depguard:
+      rules:
+        # eval and the loader run inside applications, so they reach stores
+        # only through the read-only store.Source interface, never an SDK.
+        # So does the CEL environment they embed.
+        no-store-sdks:
+          files:
+            - "**/eval/**"
+            - "**/loader/**"
+            - "**/internal/celenv/**"
+          deny:
+            - pkg: github.com/aws/aws-sdk-go-v2
+              desc: eval and the loader reach stores only through store.Source
+            - pkg: github.com/hashicorp/consul/api
+              desc: eval and the loader reach stores only through store.Source
+            - pkg: go.etcd.io/etcd
+              desc: eval and the loader reach stores only through store.Source
+            - pkg: github.com/Azure/azure-sdk-for-go
+              desc: eval and the loader reach stores only through store.Source
+            - pkg: cloud.google.com/go/storage
+              desc: eval and the loader reach stores only through store.Source
     forbidigo:
       forbid:
         - pattern: ^panic$

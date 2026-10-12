@@ -15,7 +15,7 @@ This directory records the decisions that shape 0cular: what was decided, why, a
 | --- | --- | --- |
 | [0001](0001-name-owner-and-module-path.md) | Name, owner and module path | Accepted |
 | [0002](0002-go-and-the-v0-stack.md) | Go and the v0 stack | Accepted |
-| [0003](0003-contract-language-cel-and-json-schema.md) | Contract language: CEL and JSON Schema | Accepted |
+| [0003](0003-contract-language-cel-and-json-schema.md) | Contract language: CEL and JSON Schema | Accepted; amended by 0014 |
 | [0004](0004-store-interface-and-versioning.md) | Store interface and versioning semantics | Accepted |
 | [0005](0005-contract-format-and-apiversion-policy.md) | Contract file format, `apiVersion` policy and decode model | Accepted |
 | 0006 | S3-compatible test server | Planned (task 3.1) |
@@ -23,4 +23,7 @@ This directory records the decisions that shape 0cular: what was decided, why, a
 | 0008 | Health evaluation | Planned (task 4.3) |
 | 0009 | Re-validating a cached LKG when the contract changes | Planned (task 2.1) |
 | [0010](0010-license-and-dco.md) | License (Apache-2.0) and DCO | Accepted |
-| [0011](0011-branches-and-promotion.md) | Branches and promotion | Proposed |
+| [0011](0011-branches-and-promotion.md) | Branches and promotion | Accepted |
+| [0012](0012-enforcing-the-dco.md) | Enforcing the DCO | Accepted |
+| [0013](0013-decode-and-schema-details.md) | Decode and schema validation details | Accepted |
+| [0014](0014-counting-cel-cost.md) | Counting the cost of CEL rules | Accepted |

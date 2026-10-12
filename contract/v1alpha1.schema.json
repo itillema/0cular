@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/itillema/0cular/main/contract/v1alpha1.schema.json",
+  "title": "0cular contract",
+  "description": "A 0cular contract (apiVersion 0cular/v1alpha1): the rules a candidate version of an artifact must meet before it's published. 0cular checks a few things this schema can't, such as unique check names.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "artifact"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "description": "The contract format. This schema describes 0cular/v1alpha1.",
+      "const": "0cular/v1alpha1"
+    },
+    "kind": {
+      "description": "Always Contract.",
+      "const": "Contract"
+    },
+    "metadata": {
+      "description": "Identifies the artifact the contract governs.",
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name",
+          "description": "The artifact's name: 1 to 63 lowercase letters, digits and hyphens, starting and ending with a letter or digit, such as bot-features."
+        }
+      }
+    },
+    "artifact": {
+      "description": "The artifact's format, and the caps that apply when decoding it.",
+      "type": "object",
+      "required": ["format", "maxBytes"],
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "description": "The artifact's file format.",
+          "enum": ["json", "yaml"]
+        },
+        "maxBytes": {
+          "$ref": "#/$defs/size",
+          "description": "The largest artifact allowed, checked before decoding: a whole number of bytes, or a whole number followed by B, KiB, MiB or GiB, such as 5MiB."
+        },
+        "maxDepth": {
+          "description": "How deeply the artifact's values may nest: {\"a\": [1]} nests 2 deep. At most 10000, the deepest nesting the JSON and YAML parsers read.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 64
+        },
+        "maxNodes": {
+          "description": "How many values the artifact may hold, after YAML aliases are expanded.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647,
+          "default": 1000000
+        }
+      }
+    },
+    "schema": {
+      "description": "The JSON Schema the artifact must match.",
+      "type": "object",
+      "required": ["jsonSchema"],
+      "additionalProperties": false,
+      "properties": {
+        "jsonSchema": {
+          "$ref": "#/$defs/relativePath",
+          "description": "The path of a Draft 2020-12 JSON Schema file, relative to the contract file and written with forward slashes, such as schemas/bot-features.schema.json. The schema must be one self-contained file, with no references to other files or URLs."
+        }
+      }
+    },
+    "invariants": {
+      "description": "Rules on the candidate alone, written in CEL. A false result or an error blocks the candidate. Absolute limits belong here.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/invariant" }
+    },
+    "diffBudgets": {
+      "description": "Limits on how much the candidate may change from the baseline. A breach needs approval, unless the budget isn't overridable, in which case it blocks.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/diffBudget" }
+    },
+    "onFailure": {
+      "description": "What a loader does when a version fails. With a last known good, every failure keeps it; the policy applies only without one.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "noLastKnownGood": {
+          "description": "What a loader does when it has no last known good: closed refuses to start, and open starts with a default value the application provides.",
+          "enum": ["closed", "open"],
+          "default": "closed"
+        },
+        "trustLastKnownGood": {
+          "description": "Whether a loader keeps a cached last known good that fails re-validation against the current contract.",
+          "type": "boolean",
+          "default": false
+        },
+        "parseError": { "$ref": "#/$defs/stale" },
+        "invariantViolation": { "$ref": "#/$defs/stale" },
+        "fetchError": { "$ref": "#/$defs/stale" }
+      }
+    }
+  },
+  "$defs": {
+    "name": {
+      "description": "1 to 63 lowercase letters, digits and hyphens, starting and ending with a letter or digit.",
+      "type": "string",
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+      "maxLength": 63
+    },
+    "expression": {
+      "description": "A CEL expression.",
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "size": {
+      "oneOf": [
+        { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        { "type": "string", "pattern": "^0*[1-9][0-9]*(B|KiB|MiB|GiB)?$" }
+      ]
+    },
+    "relativePath": {
+      "type": "string",
+      "pattern": "\\S",
+      "allOf": [
+        { "not": { "pattern": "^[A-Za-z][A-Za-z0-9+.-]*://" } },
+        { "not": { "pattern": "^(/|[A-Za-z]:)" } },
+        { "not": { "pattern": "[\\\\\\x00]" } }
+      ]
+    },
+    "limit": {
+      "type": "number",
+      "minimum": 0
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9223372036854775807
+    },
+    "overridable": {
+      "description": "Whether an approval can accept a breach. If it can't, a breach blocks the candidate.",
+      "type": "boolean",
+      "default": true
+    },
+    "stale": {
+      "description": "With a last known good, every failure keeps it, so stale is the only value.",
+      "const": "stale"
+    },
+    "invariant": {
+      "type": "object",
+      "required": ["name", "expr"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name",
+          "description": "Identifies the rule in reports and metrics. Each check in a contract needs its own name."
+        },
+        "expr": {
+          "$ref": "#/$defs/expression",
+          "description": "A CEL expression that must be true, such as size(self.features) <= 200."
+        },
+        "message": {
+          "description": "Why the rule exists. Reports show it when the rule fails.",
+          "type": "string"
+        }
+      }
+    },
+    "diffBudget": {
+      "description": "A measure budget compares one value computed from both versions; a collection budget compares two keyed lists.",
+      "type": "object",
+      "if": { "required": ["collection"] },
+      "then": { "$ref": "#/$defs/collectionBudget" },
+      "else": { "$ref": "#/$defs/measureBudget" }
+    },
+    "measureBudget": {
+      "type": "object",
+      "required": ["name", "measure"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name",
+          "description": "Identifies the budget in reports and metrics. Each check in a contract needs its own name."
+        },
+        "measure": {
+          "$ref": "#/$defs/expression",
+          "description": "A CEL expression evaluated on the candidate and on the baseline, such as size(self.features)."
+        },
+        "maxChangePct": {
+          "$ref": "#/$defs/limit",
+          "description": "Limits |candidate − baseline| / max(|baseline|, 1) × 100."
+        },
+        "maxIncrease": {
+          "$ref": "#/$defs/limit",
+          "description": "Limits candidate − baseline."
+        },
+        "maxDecrease": {
+          "$ref": "#/$defs/limit",
+          "description": "Limits baseline − candidate."
+        },
+        "overridable": { "$ref": "#/$defs/overridable" }
+      },
+      "anyOf": [
+        { "required": ["maxChangePct"] },
+        { "required": ["maxIncrease"] },
+        { "required": ["maxDecrease"] }
+      ]
+    },
+    "collectionBudget": {
+      "type": "object",
+      "required": ["name", "collection", "key"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name",
+          "description": "Identifies the budget in reports and metrics. Each check in a contract needs its own name."
+        },
+        "collection": {
+          "$ref": "#/$defs/expression",
+          "description": "A CEL expression for a list, evaluated on the candidate and on the baseline, such as self.policies."
+        },
+        "key": {
+          "$ref": "#/$defs/expression",
+          "description": "A CEL expression over item that identifies each element, such as item.id."
+        },
+        "maxRemoved": {
+          "$ref": "#/$defs/count",
+          "description": "Limits how many keys the candidate drops."
+        },
+        "maxAdded": {
+          "$ref": "#/$defs/count",
+          "description": "Limits how many keys the candidate adds."
+        },
+        "maxChangedPct": {
+          "$ref": "#/$defs/limit",
+          "description": "Limits the percentage of the baseline's elements whose value changes."
+        },
+        "overridable": { "$ref": "#/$defs/overridable" }
+      },
+      "anyOf": [
+        { "required": ["maxRemoved"] },
+        { "required": ["maxAdded"] },
+        { "required": ["maxChangedPct"] }
+      ]
+    }
+  }
+}
