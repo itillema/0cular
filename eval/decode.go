@@ -102,6 +102,11 @@ type Document struct {
 	Digest string
 }
 
+// tooLarge is the error for an artifact of size bytes, over maxBytes.
+func tooLarge(size, maxBytes int64) *DecodeError {
+	return &DecodeError{Err: ErrTooLarge, Message: fmt.Sprintf("the artifact is %d bytes, more than maxBytes (%d)", size, maxBytes)}
+}
+
 // limits are the caps that apply while decoding one artifact.
 type limits struct {
 	maxDepth int
@@ -135,10 +140,7 @@ func Decode(ctx context.Context, data []byte, a contract.Artifact) (*Document, e
 			a.MaxBytes, a.MaxDepth, a.MaxNodes)
 	}
 	if size := int64(len(data)); size > a.MaxBytes {
-		return nil, &DecodeError{
-			Err:     ErrTooLarge,
-			Message: fmt.Sprintf("the artifact is %d bytes, more than maxBytes (%d)", size, a.MaxBytes),
-		}
+		return nil, tooLarge(size, a.MaxBytes)
 	}
 	if !utf8.Valid(data) {
 		off := invalidUTF8(data)

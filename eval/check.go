@@ -130,11 +130,17 @@ type Result struct {
 
 // Input is one version of an artifact to check.
 type Input struct {
-	// Data is the version's bytes.
+	// Data is the version's bytes, or, for a version larger than the
+	// contract's maxBytes, the first maxBytes+1 of them.
 	Data []byte
 	// Key is the artifact's key in its store, or its file path. Rules read
 	// it as meta.key.
 	Key string
+	// Size and Digest are the whole version's, as ReadInput sets them. Check
+	// uses them only when Data holds just the start of the version, and
+	// otherwise computes both from Data.
+	Size   int64
+	Digest string
 }
 
 // Evaluator checks candidates against one contract. New compiles the
@@ -290,6 +296,9 @@ func (e *Evaluator) Check(ctx context.Context, candidate Input, baseline *Input)
 }
 
 func artifactOf(in Input) Artifact {
+	if in.partial() {
+		return Artifact{Key: in.Key, Size: in.Size, Digest: in.Digest}
+	}
 	sum := sha256.Sum256(in.Data)
 	return Artifact{Key: in.Key, Size: int64(len(in.Data)), Digest: "sha256:" + hex.EncodeToString(sum[:])}
 }
@@ -299,8 +308,18 @@ func artifactOf(in Input) Artifact {
 func (e *Evaluator) envelope(ctx context.Context, name string, in Input) (*Document, Check, error) {
 	start := time.Now()
 	a := e.contract.Artifact
-	doc, err := Decode(ctx, in.Data, a)
 	check := Check{Kind: KindEnvelope, Name: name}
+	if in.partial() {
+		// ReadInput kept only the start of a version too large to decode.
+		check.Status, check.Evidence = StatusFail, tooLarge(in.Size, a.MaxBytes).Error()
+		if in.Size <= a.MaxBytes {
+			check.Status = StatusError
+			check.Evidence = fmt.Sprintf("only %d of the version's %d bytes were read; read it with ReadInput and this contract", len(in.Data), in.Size)
+		}
+		check.Duration = time.Since(start)
+		return nil, check, nil
+	}
+	doc, err := Decode(ctx, in.Data, a)
 	var de *DecodeError
 	switch {
 	case err == nil:

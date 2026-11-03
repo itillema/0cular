@@ -19,7 +19,7 @@ const (
 	Text Format = "text"
 	// Markdown is for GitHub Job Summaries and pull request comments: the
 	// verdict, then a table of the checks, attention first.
-	Markdown Format = "markdown"
+	Markdown Format = "md"
 	// JSON is for programs: every field of the result, in step order. Its
 	// schemaVersion is 1.
 	JSON Format = "json"
@@ -38,12 +38,16 @@ func Formats() []Format {
 	return []Format{Text, Markdown, JSON}
 }
 
-// ParseFormat returns the format that name names, such as markdown.
+// ParseFormat returns the format that name names: text, md or json.
+// markdown names Markdown too.
 func ParseFormat(name string) (Format, error) {
+	if name == "markdown" {
+		return Markdown, nil
+	}
 	if f := Format(name); slices.Contains(Formats(), f) {
 		return f, nil
 	}
-	return "", fmt.Errorf("%w %q: use text, markdown or json", ErrFormat, visible(cut(name, 40)))
+	return "", fmt.Errorf("%w %q: use text, md or json", ErrFormat, visible(cut(name, 40)))
 }
 
 // Write renders r to w in format f.
@@ -56,7 +60,7 @@ func Write(w io.Writer, r *eval.Result, f Format) error {
 	case JSON:
 		return writeJSON(w, r)
 	}
-	return fmt.Errorf("%w %q: use text, markdown or json", ErrFormat, visible(cut(string(f), 40)))
+	return fmt.Errorf("%w %q: use text, md or json", ErrFormat, visible(cut(string(f), 40)))
 }
 
 // byAttention orders checks for a reader: those that block first, then

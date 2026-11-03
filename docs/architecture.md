@@ -2,7 +2,7 @@
 
 0cular gives config and data changes the safety net that code already has: it checks a change before it's published, keeps the last known good copy when a service loads it, and rolls changes out in rings with automatic revert. This page explains how the parts fit together. The [build plan](BUILD_PLAN.md) has the full design and the schedule, and the [ADRs](adr/README.md) record the decisions.
 
-> **Status: pre-alpha.** This describes the design. Today the repository has the CLI skeleton and the [replay suite](../replay/); the gate arrives in v0.1, the loader in v0.2, publishing in v0.3 and rings in v0.4.
+> **Status: pre-alpha.** This describes the design. Today the repository has the gate's checks and reports, the `check`, `contract lint` and `replay run` commands, and the [replay suite](../replay/). The rest of v0.1 (`diff`, approvals and the GitHub Action) comes next, then the loader in v0.2, publishing in v0.3 and rings in v0.4.
 
 ## Overview
 

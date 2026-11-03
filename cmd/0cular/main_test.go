@@ -56,26 +56,35 @@ func TestBinaryExitCodes(t *testing.T) {
 		{name: "extra argument", args: []string{"version", "extra"}, wantCode: exitUsage},
 		{name: "contract schema", args: []string{"contract", "schema"}, wantCode: exitPass},
 		{name: "contract without a subcommand", args: []string{"contract"}, wantCode: exitUsage},
+		{name: "check without flags", args: []string{"check"}, wantCode: exitUsage},
+		{name: "replay run", args: []string{"replay", "run"}, wantCode: exitPass},
+		{name: "replay run with an unknown scenario", args: []string{"replay", "run", "nope"}, wantCode: exitUsage},
+		{name: "replay without a subcommand", args: []string{"replay"}, wantCode: exitUsage},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
-			defer cancel()
-			//nolint:gosec // G204: binary is this test's own build, and the arguments come from the table above.
-			out, err := exec.CommandContext(ctx, binary, tt.args...).CombinedOutput()
-			code := 0
-			if err != nil {
-				var exitErr *exec.ExitError
-				if !errors.As(err, &exitErr) {
-					t.Fatalf("running 0cular: %v", err)
-				}
-				code = exitErr.ExitCode()
-			}
-			if code != tt.wantCode {
+			if code, out := runBinary(t, tt.args...); code != tt.wantCode {
 				t.Errorf("0cular %s exited with %d, want %d; output:\n%s", strings.Join(tt.args, " "), code, tt.wantCode, out)
 			}
 		})
 	}
+}
+
+// runBinary runs the binary with args, and returns its exit code and its
+// combined output.
+func runBinary(t *testing.T, args ...string) (int, string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, binary, args...).CombinedOutput()
+	if err == nil {
+		return 0, string(out)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("running 0cular: %v", err)
+	}
+	return exitErr.ExitCode(), string(out)
 }
 
 func TestBinaryVersion(t *testing.T) {
@@ -99,20 +108,25 @@ func TestBinaryContractLint(t *testing.T) {
 		"invalid.yaml": exitBlock,
 		"missing.yaml": exitUsage,
 	} {
-		ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
-		//nolint:gosec // G204: binary is this test's own build, and the file is one this test wrote.
-		out, err := exec.CommandContext(ctx, binary, "contract", "lint", filepath.Join(dir, name)).CombinedOutput()
-		cancel()
-		code := 0
-		if err != nil {
-			var exitErr *exec.ExitError
-			if !errors.As(err, &exitErr) {
-				t.Fatalf("running 0cular: %v", err)
-			}
-			code = exitErr.ExitCode()
-		}
-		if code != wantCode {
+		if code, out := runBinary(t, "contract", "lint", filepath.Join(dir, name)); code != wantCode {
 			t.Errorf("0cular contract lint %s exited with %d, want %d; output:\n%s", name, code, wantCode, out)
+		}
+	}
+}
+
+func TestBinaryCheck(t *testing.T) {
+	dir := checkTestFiles(t)
+	for candidate, wantCode := range map[string]int{
+		"within-budget.json": exitPass,
+		"over-budget.json":   exitNeedsApproval,
+		"zero-limit.json":    exitBlock,
+		"too-large.json":     exitBlock,
+		"missing.json":       exitUsage,
+	} {
+		code, out := runBinary(t, "check", "--contract", filepath.Join(dir, "contract.yaml"),
+			"--candidate", filepath.Join(dir, candidate), "--baseline", filepath.Join(dir, "baseline.json"))
+		if code != wantCode {
+			t.Errorf("0cular check on %s exited with %d, want %d; output:\n%s", candidate, code, wantCode, out)
 		}
 	}
 }

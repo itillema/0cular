@@ -320,6 +320,9 @@ func TestParseFormat(t *testing.T) {
 			t.Errorf("ParseFormat(%q) = %q, %v", f, got, err)
 		}
 	}
+	if got, err := ParseFormat("markdown"); got != Markdown || err != nil {
+		t.Errorf("ParseFormat(markdown) = %q, %v; want %q", got, err, Markdown)
+	}
 	if _, err := ParseFormat("html" + rlo); !errors.Is(err, ErrFormat) || strings.Contains(err.Error(), rlo) {
 		t.Errorf("ParseFormat(html + RLO) error = %v, want ErrFormat with the RLO escaped", err)
 	}

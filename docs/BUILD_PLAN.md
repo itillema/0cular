@@ -13,7 +13,7 @@ How the plan is kept:
 | --- | --- |
 | Current phase | Phase 1 — v0.1 "Check": in progress |
 | Last updated | 2026-11-03 |
-| Next task | 1.4 CLI: `check`, `diff`, `replay run` and the exit codes, with `contract lint` and `contract schema` already done. Done so far: 1.1 `contract`, 1.2 `eval` and 1.3 `report` |
+| Next task | 1.4 CLI: `diff`, the last command; `check`, `contract lint`, `contract schema`, `replay run` and `version` are done, with the exit codes. Done so far: 1.1 `contract`, 1.2 `eval`, 1.3 `report` and 1.7 replay |
 | Blocked on | The maintainer's review of the work since Phase 1 began |
 | Latest release | None |
 | Planned releases | v0.1 Check, v0.2 Keep, v0.3 Publish, v0.4 Rings |
@@ -617,7 +617,7 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
 - [ ] 1.4 CLI: `check` (with `--baseline` or `--no-baseline`), `diff`, `contract lint`, `contract schema`, `replay run` and `version`, with the exit codes in Appendix F.
 - [ ] 1.5 `gate` library: `Check` with bound approvals (§3.4), plus examples.
 - [ ] 1.6 GitHub Action (§3.11): the composite action in `action/`, the contract from the base ref, annotations and a Job Summary, and the optional two-workflow sticky comment. It builds from source until v0.1.0 exists.
-- [ ] 1.7 Replay: the three scenarios BLOCK at `check`, with evidence that names the violated rule.
+- [x] 1.7 Replay: the three scenarios BLOCK at `check`, with evidence that names the violated rule.
 - [ ] 1.8 Docs:
   - README quickstart (under 10 minutes);
   - `docs/contract-spec.md`, with the decode model;

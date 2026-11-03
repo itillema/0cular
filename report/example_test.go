@@ -33,11 +33,11 @@ func ExampleWrite() {
 }
 
 func ExampleParseFormat() {
-	f, err := report.ParseFormat("markdown")
+	f, err := report.ParseFormat("md")
 	fmt.Println(f, err)
 	_, err = report.ParseFormat("html")
 	fmt.Println(err)
 	// Output:
-	// markdown <nil>
-	// unknown report format "html": use text, markdown or json
+	// md <nil>
+	// unknown report format "html": use text, md or json
 }
