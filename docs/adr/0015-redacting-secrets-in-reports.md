@@ -1,7 +1,7 @@
 # ADR-0015: Redacting secrets in reports
 
-- **Status:** Proposed
-- **Date:** 2026-10-12
+- **Status:** Accepted
+- **Date:** 2026-11-03
 
 ## Context
 

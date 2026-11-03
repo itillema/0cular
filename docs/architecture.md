@@ -157,7 +157,7 @@ flowchart TD
 
 | Metric | Type | Labels |
 | --- | --- | --- |
-| `zerocular_config_info` | gauge (=1) | artifact, config_version, ring, instance_id |
+| `zerocular_config_info` | gauge (=1) | artifact, config_version, ring, instance_id, region, zone, cell |
 | `zerocular_loads_total` | counter | artifact, result |
 | `zerocular_check_failures_total` | counter | artifact, check |
 | `zerocular_stale` | gauge (0 or 1) | artifact |

@@ -8,13 +8,15 @@
 
 ## Why
 
-Code ships through staged, health-checked rollouts. Config and data usually don't: they move through fast global channels, so one bad change can break every consumer of that kind at once. Five of the largest outages since mid-2024 started this way:
+Code ships through staged, health-checked rollouts. Config and data usually don't: they move through fast global channels, so one bad change can break every consumer of that kind at once. Several of the largest outages since mid-2024 started this way:
 
 | Date | Incident |
 | --- | --- |
 | Dec 5, 2025 | Cloudflare: a global config change hit a years-old proxy bug |
 | Nov 18, 2025 | Cloudflare: a query returned duplicate rows, and a feature file grew past the proxy's 200-feature limit |
+| Oct 29, 2025 | Microsoft: valid configuration changes produced metadata that crashed Azure Front Door's data plane minutes later, after the change had been saved as the last known good |
 | Oct 19–20, 2025 | AWS: DNS automation applied a stale plan, then deleted it, emptying the DynamoDB endpoint record |
+| Oct 9, 2025 | Microsoft: a cleanup operation bypassed Azure Front Door's configuration protection, and erroneous metadata crashed its data plane in Europe and Africa |
 | Jun 12, 2025 | Google Cloud: a policy record with blank fields crash-looped Service Control in every region |
 | Jul 19, 2024 | CrowdStrike: a template type defined 21 input fields; the sensor's code supplied 20 |
 

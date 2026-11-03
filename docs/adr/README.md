@@ -19,7 +19,7 @@ This directory records the decisions that shape 0cular: what was decided, why, a
 | [0004](0004-store-interface-and-versioning.md) | Store interface and versioning semantics | Accepted |
 | [0005](0005-contract-format-and-apiversion-policy.md) | Contract file format, `apiVersion` policy and decode model | Accepted |
 | 0006 | S3-compatible test server | Planned (task 3.1) |
-| 0007 | Rollout manifest and ring hashing | Planned (task 4.1) |
+| 0007 | Rollout manifest, ring hashing, topology rings and supersession | Planned (task 4.1) |
 | 0008 | Health evaluation | Planned (task 4.3) |
 | 0009 | Re-validating a cached LKG when the contract changes | Planned (task 2.1) |
 | [0010](0010-license-and-dco.md) | License (Apache-2.0) and DCO | Accepted |
@@ -27,4 +27,4 @@ This directory records the decisions that shape 0cular: what was decided, why, a
 | [0012](0012-enforcing-the-dco.md) | Enforcing the DCO | Accepted |
 | [0013](0013-decode-and-schema-details.md) | Decode and schema validation details | Accepted |
 | [0014](0014-counting-cel-cost.md) | Counting the cost of CEL rules | Accepted |
-| [0015](0015-redacting-secrets-in-reports.md) | Redacting secrets in reports | Proposed |
+| [0015](0015-redacting-secrets-in-reports.md) | Redacting secrets in reports | Accepted |

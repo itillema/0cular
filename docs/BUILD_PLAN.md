@@ -12,7 +12,7 @@ How the plan is kept:
 | Field | Value |
 | --- | --- |
 | Current phase | Phase 1 — v0.1 "Check": in progress |
-| Last updated | 2026-10-12 |
+| Last updated | 2026-11-03 |
 | Next task | 1.4 CLI: `check`, `diff`, `replay run` and the exit codes, with `contract lint` and `contract schema` already done. Done so far: 1.1 `contract`, 1.2 `eval` and 1.3 `report` |
 | Blocked on | The maintainer's review of the work since Phase 1 began |
 | Latest release | None |
@@ -41,13 +41,15 @@ How the plan is kept:
 
 Code ships through staged, health-checked rollouts. Config and data usually don't. They move through fast global channels because speed is the point: threat signatures, bot models, quota rules and routing plans must take effect quickly. Large cloud services push hundreds of configuration changes a day (ctest, OSDI 2020). When one of those changes breaks a consumer, it can break every consumer of that kind at once.
 
-### 1.1 Five incidents, one pattern
+### 1.1 Seven incidents, one pattern
 
 | Date | What changed | What broke | Impact | Control that would likely have caught it |
 | --- | --- | --- | --- | --- |
 | Dec 5, 2025 | Cloudflare turned off an internal WAF test tool through its global config system while mitigating a React Server Components CVE | The change reached the fleet in seconds and hit a years-old bug in the FL1 proxy | About 25 min; about 28% of Cloudflare's HTTP traffic | Consumer-in-the-loop test; staged rings |
 | Nov 18, 2025 | A database permission change made a query return duplicate rows, doubling the size of the Bot Management feature file | The FL2 proxy preallocated memory for 200 features (normal use: about 60) and panicked on the file with more than 200, returning 5xx errors; the older FL proxy didn't error but gave all traffic a bot score of 0. The file was regenerated every five minutes and published to the entire network | Failures began at 11:20 UTC; core traffic was largely flowing again by about 14:30; everything was normal by 17:06 UTC | Invariant on the cap; diff budget on item count; fail-stale loader |
+| Oct 29, 2025 | Valid customer configuration changes, made across two versions of Azure Front Door's control plane, produced incompatible configuration metadata | A latent data-plane bug crashed on the metadata about five minutes after it reached pre-production. Health signals still looked good, so the change advanced to the edge sites, and because it had deployed, it was written into the last-known-good snapshot; Microsoft had to edit that snapshot by hand to recover | Connection timeouts and DNS failures for Azure Front Door and CDN from 15:41 UTC to 00:05 UTC the next day; customer configuration changes stayed blocked until Nov 5 | A bake longer than the delayed crash; a last known good only after a version survives (`goodAfter`, the final ring's bake); consumer-in-the-loop test; fleet-wide freeze |
 | Oct 19–20, 2025 | A race in DynamoDB's DNS automation let a stale plan overwrite a newer one, and cleanup then deleted it | The regional endpoint was left with an empty DNS record that automation couldn't repair | DynamoDB impaired about 3 h; broader us-east-1 impact about 14.5 h | Invariant that the record is never empty; a publish that asserts its parent (stale-writer protection) |
+| Oct 9, 2025 | A tenant cleanup operation bypassed Azure Front Door's configuration protection system | Erroneous metadata, produced by a control-plane defect, reached later stages and crashed the data plane on about 26% of Azure Front Door's resources in Europe and Africa | 07:50 to 16:00 UTC, mainly in Europe and Africa | Checks in the consumer that don't depend on the publish path, with crash fallback; consumer-in-the-loop test (one of Microsoft's repairs is validation against a replica of the data plane) |
 | Jun 12, 2025 | A quota policy with unintended blank fields was written to Service Control's regional tables | It replicated globally in seconds. A May 29 code path without error handling or a feature flag crash-looped on the null value | About 3 h for most products | Non-null invariant; fail-stale loader with crash fallback |
 | Jul 19, 2024 | CrowdStrike Channel File 291 (Rapid Response Content) | The Template Type defined 21 input fields; the sensor code supplied 20, so the Content Interpreter read out of bounds and crashed | About 8.5M Windows devices (Microsoft's estimate) | Consumer-in-the-loop test; staged rings; crash fallback |
 
@@ -87,6 +89,7 @@ The "control" column is our judgment from the postmortems, not the companies' cl
 | --- | --- |
 | Cloudflare Code Orange: Fail Small (plan Dec 2025; completed spring 2026) | Health-mediated deployment for config; "fail stale" to the last known good where possible, else fail open or closed |
 | Google Cloud's Service Control report (Jun 2025) | Incremental propagation of globally replicated data; feature-flag new code paths; fail open; randomized backoff |
+| Microsoft's Azure Front Door reviews (Oct 2025) | Finish processing a change before it advances; bake longer than delayed failures; promote a last known good only after it proves healthy; cache config locally; isolate cells |
 | CrowdStrike RCA (Aug 2024) | Field-count validation; bounds checks; staged deployment rings; customer control |
 | ctest (OSDI 2020) | Test config changes against the code that uses them |
 | Kayenta (Spinnaker) | Statistical canary judgment (Mann–Whitney U) on metrics |
@@ -100,6 +103,10 @@ The "control" column is our judgment from the postmortems, not the companies' cl
 - **beside monitoring**, as a promoter.
 
 It complements Argo Rollouts and Flagger (pods), flag tools (per-user flags) and policy engines (value rules).
+
+**Where it applies.** 0cular guards artifact-shaped config and data: files, bundles and documents that a producer publishes to a store and consumers load. Data that a database replicates on its own, such as quota-policy rows, or that a system serves itself, such as DNS records, fits only through a snapshot published as an artifact, or a custom `Source`. 0cular doesn't sit in those serving paths.
+
+**Scale.** The v0.4 promoter reads health per instance from one Prometheus, which suits the fleets one Prometheus can see. A hyperscaler's fleet needs health aggregated by cell and region, which topology rings (§3.9) prepare for.
 
 ### 2.4 Who it's for
 
@@ -151,7 +158,7 @@ It complements Argo Rollouts and Flagger (pods), flag tools (per-user flags) and
 | `invariants[]` | list | `name`, `expr` (CEL → bool), `message`; always BLOCK on false or error. Absolute limits go here |
 | `diffBudgets[]` | list | Measure and collection budgets on change against the baseline; NEEDS_APPROVAL on breach unless `overridable: false` |
 | `consumerTests[]` (v0.3) | list | `name`, `run` (argv), `container`, `sandbox`, `env`, `timeout`, `expectExit`, optional `replay` |
-| `rollout` (v0.4) | object | `rings[]` (`name`, `upTo` bucket, `minInstances`, `instances`), `bake`, `health` (§3.9) |
+| `rollout` (v0.4) | object | `rings[]` (`name`, `upTo` bucket, `match` on `region`, `zone` or `cell`, `minInstances`, `instances`), `bake`, `health` (§3.9) |
 | `report.redact` | list | Field-name patterns whose values reports hide, in addition to the built-in `password`, `passwd`, `secret`, `token`, `credential`, `apikey`, `privatekey` and `authorization`. Matching ignores case and everything but letters and digits (ADR-0015) |
 | `onFailure` | object | `noLastKnownGood`: `closed` (default) or `open`; `trustLastKnownGood`: default `false` (ADR-0009). `parseError`, `invariantViolation` and `fetchError` accept only `stale`; lint rejects `open` and `closed` there |
 
@@ -325,13 +332,13 @@ cfg, version := l.Current()     // always a validated snapshot
 
 | Metric | Type | Labels |
 | --- | --- | --- |
-| `zerocular_config_info` | gauge (=1) | artifact, config_version, ring, instance_id |
+| `zerocular_config_info` | gauge (=1) | artifact, config_version, ring, instance_id, region, zone, cell |
 | `zerocular_loads_total` | counter | artifact, result (`applied`, `rejected`, `unchanged`, `fetch_error`) |
 | `zerocular_check_failures_total` | counter | artifact, check |
 | `zerocular_stale` | gauge (0/1) | artifact |
 | `zerocular_last_success_timestamp_seconds` | gauge | artifact |
 
-Metric names use the letter-first `zerocular_` prefix, because a Prometheus metric name can't start with a digit (ADR-0001). `config_version` is the version being served, and only that one. `instance_id` lets the promoter build ring lists (§3.9); it adds no series, since each instance already has its own.
+Metric names use the letter-first `zerocular_` prefix, because a Prometheus metric name can't start with a digit (ADR-0001). `config_version` is the version being served, and only that one. `instance_id` and the topology labels `region`, `zone` and `cell` let the promoter build ring lists (§3.9); they add no series, since each instance already has its own and has one value of each.
 
 **Health.** `Health()` returns a state plus the current version's age:
 - `ok`: serving the assigned version.
@@ -381,6 +388,7 @@ On Kubernetes:
 **Revert and pin (v0.3):**
 - `0cular revert <artifact> [--to <version>]` moves the pointer back to its parent (or the given version) through the same compare-and-swap. From v0.4 it sets every ring to the fleet LKG and pauses.
 - **Break-glass pin.** `ZEROCULAR_PIN_<NAME>=lkg|<version>`, or a `PIN` file in the cache directory, makes the loader ignore the pointer and serve that version from its cache (`lkg` is the `good` slot). Use it when the store or pointer is unavailable or wrong. `<NAME>` is the artifact name uppercased, with non-alphanumerics turned into `_`: `ZEROCULAR_PIN_BOT_FEATURES`. Environment names can't start with a digit, so the prefix uses the letter-first form; the loader, agent and CLI warn about any variable that starts with the digit spelling, `0CULAR_` (ADR-0001).
+- **Fleet-wide freeze.** `0cular freeze --reason TEXT` writes a freeze record to the store. While it's there, `publish`, `rollout start`, `rollout step` and the promoter refuse to act; `0cular unfreeze` removes it. `revert` and pins still work, since they're how you recover. After their incidents, Microsoft blocked customer configuration changes and AWS turned off its DNS automation worldwide (§13).
 
 **Manifest (v0.4).** The rollout manifest lives in the pointer, as `formatVersion: 2`:
 
@@ -406,14 +414,15 @@ On Kubernetes:
 
 **Ring assignment:**
 - `bucket` = the first 8 bytes of SHA-256(instanceID) as a big-endian uint64, mod 10000. The instance ID comes from config: env, hostname or pod name.
-- An instance listed in a ring's `instances` takes that ring; others take the first ring with `bucket < upTo`.
+- **Topology labels.** An instance can also carry `region`, `zone` and `cell` labels, from config like its ID. A ring's `match`, such as `{cell: [c1]}`, limits the ring to instances whose labels match. Rings can then move in waves that contain the blast radius: a canary, then one cell, then one region, then everyone.
+- An instance listed in a ring's `instances` takes that ring; others take the first ring whose `match` holds for them (a ring without `match` holds for every instance) and whose `upTo` is above their bucket. ADR-0007 settles the details.
 - **Small fleets:** when fewer than `minInstances` instances fall in a ring, the promoter adds the instances with the next-lowest buckets (from the `instance_id` label) to that ring's `instances`.
 
 **Health** (ADR-0008):
 - **Queries** (`perInstance`) are PromQL templates that return one value per instance, aggregated `by` the join labels; the promoter adds the version join (§3.6). `{{.Window}}` is the rate window.
 - **Liveness:** `count by (config_version) (zerocular_config_info{artifact="…", ring="…"})` against the ring's expected size (its instance count before the change), plus `up`. A crashed consumer stops reporting.
 - **Adoption:** bake time starts when about 90% of the ring's expected instances report the candidate, not when the manifest changes. Evaluation starts one rate window later.
-- **Control:** the instances in rings still on the fleet LKG. The final ring has no untouched control, so its own pre-rollout window serves as the control, and any `slo` limits apply.
+- **Control:** the instances in rings still on the fleet LKG. The final ring has no untouched control, so its own pre-rollout window serves as the control, and any `slo` limits apply. With topology rings, ADR-0008 picks the control from comparable instances where it can, such as those in the same region.
 
 **Promoter loop**, as a long-running process or a CI step:
 
@@ -438,6 +447,8 @@ after the final ring passes its bake: lastKnownGood = candidate
 ```
 
 `minEffect[q]` is the smallest difference between the medians, in the query's units, that counts as a regression. If go-moremath's license doesn't fit, v0.4 ships the thresholds alone and defers the U test.
+
+**Supersession and fast-moving data.** A newer candidate supersedes one still baking in the same ring: the ring takes the newer version and restarts its bake, and each later ring takes only a version that has passed the ring before it. Data that changes every few minutes then moves through the fleet as a train, and `lastKnownGood` advances each time a version passes the final ring. Bake times are per artifact; set each one longer than the slowest way a bad version fails. Azure Front Door's crash on Oct 29, 2025 surfaced about five minutes after the change reached pre-production (§1.1). For data that must reach every consumer within minutes, contract checks and fail-stale loading without rings are the fast lane. ADR-0007 records the details.
 
 ### 3.10 Postmortem replay suite
 
@@ -473,6 +484,7 @@ The scenarios use synthetic data with shapes inspired by public postmortems. The
 | `0cular get`, `history`, `status` | 3 | Inspect versions, approvals and the LKG |
 | `0cular test-consumer` | 3 | Consumer-in-the-loop tests |
 | `0cular revert` | 3 | Pointer back to its parent; from Phase 4, every ring back to the fleet LKG |
+| `0cular freeze`, `unfreeze` | 3 | Stop every publish and promotion until unfrozen; revert and pins still work |
 | `0cular rollout start`, `status`, `step`, `pause`, `resume` | 4 | Manage rings |
 | `0cular promoter run` | 4 | Long-running promoter, or a one-shot CI step |
 
@@ -652,7 +664,7 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
 - [ ] 3.1 Write ADR-0006 (S3-compatible test server). Then the `Store` adapters (§3.5): `file`, `s3` (S3-compatible), and one of `consul` or `etcd`, chosen with design partners. Each has a write-once `PutBlob`, `CompareAndSwapPointer`, metadata objects, a documented size limit and a `Source` view for loaders.
 - [ ] 3.2 `store verify`, the conditional-write probe. `publish` refuses a store that fails it.
 - [ ] 3.3 `publish` (gate against the parent → `PutBlob` → compare-and-swap that asserts the parent), `get`, `history` and `status`. Record approvals in metadata, with an audit view (`history --approvals`).
-- [ ] 3.4 `revert` and the break-glass pin (§3.9).
+- [ ] 3.4 `revert`, the break-glass pin and the fleet-wide freeze (§3.9).
 - [ ] 3.5 `test-consumer` (§3.8): a container runner with the default sandbox, a host runner only with `sandbox: none`, `replay` JSONL, and timeouts.
 - [ ] 3.6 Replay: add `killswitch-unhandled-rule`, with its stub proof. `field-count-mismatch` and `killswitch-unhandled-rule` BLOCK through consumer tests, and the stale plan in `emptied-record` fails its parent check.
 - [ ] 3.7 Integration tests on Linux (`integration` tag): testcontainers for the S3-compatible server (ADR-0006), Consul and etcd; gofakes3 in unit tests.
@@ -663,13 +675,14 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
 - Concurrent publishers never clobber each other (CAS race test), and a publish built on a stale parent is refused.
 - `store verify` fails against a fake backend that ignores conditional writes, and `publish` then refuses to run.
 - `revert` reaches loaders within one poll interval, and a pin overrides the pointer.
+- A freeze stops `publish` and promotion until `unfreeze`; `revert` and pins still work.
 
 ### Phase 4 — v0.4 "Rings" (8–10 weeks)
 
 **Goal:** health-mediated deployment for data, with automatic revert.
 
-- [ ] 4.1 Write ADR-0007 (rollout manifest and ring hashing). Then the manifest as pointer format 2 (§3.9), and `rollout start`, `status`, `step`, `pause` and `resume` through compare-and-swap.
-- [ ] 4.2 Ring resolver in the loader and agent: SHA-256 buckets, explicit instance lists, `minInstances`, and the rejected-version list.
+- [ ] 4.1 Write ADR-0007 (rollout manifest, ring hashing, topology rings and supersession). Then the manifest as pointer format 2 (§3.9), and `rollout start`, `status`, `step`, `pause` and `resume` through compare-and-swap.
+- [ ] 4.2 Ring resolver in the loader and agent: SHA-256 buckets, topology labels (`match` on region, zone and cell), explicit instance lists, `minInstances`, and the rejected-version list.
 - [ ] 4.3 Write ADR-0008 (health evaluation). Then the health providers:
   - the Prometheus HTTP API with per-instance query templates and the configurable version join (§3.6);
   - liveness and adoption checks, threshold rules and `slo` limits;
@@ -693,6 +706,8 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
 - A candidate ring that stops reporting while the control reports is reverted.
 - The promoter never promotes on missing data, and pauses only when both sides are missing or Prometheus is unreachable.
 - Revert works with the promoter stopped.
+- With rings that match on `cell`, the demo's runtime-only failure reaches only the first cell's instances.
+- A newer candidate supersedes one still baking: its ring restarts the bake, and no ring takes a version that hasn't passed the ring before it.
 - The ring-share property test passes (§6).
 
 ### Later — Meet teams where they are
@@ -708,6 +723,9 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
 ### Toward 1.0
 
 - Contract spec `v1` with a compatibility policy.
+- Standalone specs for the contract, pointer and manifest formats, each versioned with its JSON Schema, so other tools can read and write them.
+- Optional `consumers` metadata in the contract: the services that read the artifact, their owners, and the regions or cells they run in, so a report shows a change's blast radius and rings can follow it.
+- Events in the shape of CDEvents for check, publish, promote and revert, written as plain JSON, without a new dependency.
 - A conformance suite published for third-party loaders.
 - A docs site, a governance doc, and a co-maintainer.
 
@@ -793,7 +811,7 @@ L = likelihood, I = impact (H/M/L).
 ## 9. Rewards and success metrics
 
 **Why it's worth doing:**
-- Config and data changes started five of the largest outages since mid-2024 (§1.1). Teams that reload data live get a pre-publish check, fail-stale loading and staged rollout for that class of change.
+- Config and data changes started several of the largest outages since mid-2024 (§1.1). Teams that reload data live get a pre-publish check, fail-stale loading and staged rollout for that class of change.
 - No open, store-agnostic equivalent exists.
 - The replay suite gives users concrete, checkable evidence of which control catches which failure shape.
 - AI configuration (prompts, model IDs, tool manifests) is live-reloaded config too, so the same safety net applies.
@@ -823,7 +841,7 @@ ADRs 0001–0010 are reserved for the decisions below, and each is written in th
 | 0004 | Store interface and versioning semantics | Task 0.5 |
 | 0005 | Contract file format and `apiVersion` policy | Task 0.5 |
 | 0006 | S3-compatible test server | Task 3.1 |
-| 0007 | Rollout manifest and ring hashing | Task 4.1 |
+| 0007 | Rollout manifest, ring hashing, topology rings and supersession | Task 4.1 |
 | 0008 | Health evaluation (thresholds + Mann–Whitney U) | Task 4.3 |
 | 0009 | Re-validating a cached LKG when the contract changes | Task 2.1 |
 | 0010 | License (Apache-2.0) and DCO | Task 0.5 |
@@ -1006,6 +1024,7 @@ Code 2 is left to the Go runtime, which uses it for an unrecovered panic. 64 and
 - Cloudflare, [Code Orange: Fail Small — our resilience plan](https://blog.cloudflare.com/fail-small-resilience-plan/) and [Code Orange: Fail Small is complete](https://blog.cloudflare.com/code-orange-fail-small-complete/)
 - AWS, [Summary of the Amazon DynamoDB service disruption in us-east-1](https://aws.amazon.com/message/101925)
 - Google Cloud, [Service Control incident report, June 12, 2025](https://status.cloud.google.com/incidents/ow5i3PPK96RduMcb1SsW)
+- Microsoft, Azure Front Door post-incident reviews: [YKYN-BWZ, October 29, 2025](https://azure.status.microsoft/en-us/status/history/?trackingId=YKYN-BWZ) and [QNBQ-5W8, October 9, 2025](https://azure.status.microsoft/en-us/status/history/?trackingId=QNBQ-5W8)
 - CrowdStrike, [Channel File 291 Incident Root Cause Analysis](https://www.crowdstrike.com/wp-content/uploads/2024/08/Channel-File-291-Incident-Root-Cause-Analysis-08.06.2024.pdf) (21 defined fields, 20 supplied) and its [executive summary](https://crowdstrike.com/wp-content/uploads/2024/08/Executive-Summary_Root-Cause-Analysis_Channel-File-291.pdf); Microsoft, [Helping our customers through the CrowdStrike outage](https://blogs.microsoft.com/blog/2024/07/20/helping-our-customers-through-the-crowdstrike-outage/) (8.5 million devices)
 - Sun et al., [Testing Configuration Changes in Context to Prevent Production Failures (ctest)](https://www.usenix.org/conference/osdi20/presentation/sun), OSDI 2020; [openctest](https://github.com/xlab-uiuc/openctest); [IDoCT](https://github.com/xlab-uiuc/IDoCT)
 - Tang et al., [Holistic Configuration Management at Facebook](https://doi.org/10.1145/2815400.2815401) (Configerator), SOSP 2015
