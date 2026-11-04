@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "contract": {
+    "name": "quota-policies",
+    "digest": "sha256:c0ffee0000000000000000000000000000000000000000000000000000000000"
+  },
+  "baseline": {
+    "key": "policies.yaml",
+    "size": 677,
+    "digest": "sha256:0be2000000000000000000000000000000000000000000000000000000000000"
+  },
+  "candidate": {
+    "key": "policies.yaml",
+    "size": 12,
+    "digest": "sha256:c521000000000000000000000000000000000000000000000000000000000000"
+  },
+  "checks": [
+    {
+      "kind": "envelope",
+      "name": "baseline",
+      "status": "pass",
+      "message": "",
+      "evidence": "677 B ≤ 1 MiB; valid YAML",
+      "cost": 0,
+      "durationMs": 0
+    },
+    {
+      "kind": "envelope",
+      "name": "candidate",
+      "status": "fail",
+      "message": "",
+      "evidence": "line 1, column 11: invalid YAML: did not find expected node content",
+      "cost": 0,
+      "durationMs": 0
+    },
+    {
+      "kind": "budget",
+      "name": "policy-count-stable",
+      "status": "skipped",
+      "message": "",
+      "evidence": "the candidate didn't decode",
+      "cost": 0,
+      "durationMs": 0
+    }
+  ],
+  "compared": false,
+  "changes": {
+    "count": 0,
+    "added": 0,
+    "removed": 0,
+    "replaced": 0,
+    "operations": []
+  }
+}

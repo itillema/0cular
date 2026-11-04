@@ -30,25 +30,33 @@ func writeMarkdown(w io.Writer, r *eval.Result) error {
 	} else {
 		b.WriteString(" · no baseline")
 	}
-	b.WriteString("\n\n| | Kind | Check | Evidence |\n| --- | --- | --- | --- |\n")
-	checks := byAttention(r.Checks)
+	b.WriteString("\n\n")
+	writeMarkdownChecks(&b, r.Checks)
+	_, err := io.WriteString(w, b.String())
+	return err
+}
+
+// writeMarkdownChecks writes a table of the checks, those that need
+// attention first, and then a list of each failed schema check's
+// violations.
+func writeMarkdownChecks(b *strings.Builder, checks []eval.Check) {
+	b.WriteString("| | Kind | Check | Evidence |\n| --- | --- | --- | --- |\n")
+	checks = byAttention(checks)
 	for _, c := range checks {
-		fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", statusEmoji(c.Status), c.Kind, markdownText(c.Name, maxMarkdownName), markdownDetail(c))
+		fmt.Fprintf(b, "| %s | %s | %s | %s |\n", statusEmoji(c.Status), c.Kind, markdownText(c.Name, maxMarkdownName), markdownDetail(c))
 	}
 	for _, c := range checks {
 		if len(c.Violations) == 0 {
 			continue
 		}
-		fmt.Fprintf(&b, "\nSchema violations in %s:\n\n", markdownText(c.Name, maxMarkdownName))
+		fmt.Fprintf(b, "\nSchema violations in %s:\n\n", markdownText(c.Name, maxMarkdownName))
 		for _, v := range c.Violations {
 			b.WriteString("- " + markdownText(describeViolation(v), maxMarkdownDetail) + "\n")
 		}
 		if more := c.ViolationCount - len(c.Violations); more > 0 {
-			fmt.Fprintf(&b, "- and %d more\n", more)
+			fmt.Fprintf(b, "- and %d more\n", more)
 		}
 	}
-	_, err := io.WriteString(w, b.String())
-	return err
 }
 
 // markdownArtifact identifies a version: its key, if it has one, and

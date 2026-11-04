@@ -6,19 +6,22 @@ import (
 	"io"
 	"slices"
 
+	"github.com/itillema/0cular/diff"
 	"github.com/itillema/0cular/eval"
 )
 
 // Format is a report format.
 type Format string
 
-// The formats Write renders.
+// The formats Write and WriteDiff render.
 const (
-	// Text is for terminals: the verdict, then a line for each check, with
-	// the checks that need attention first.
+	// Text is for terminals: a check's verdict, or a diff's versions, then
+	// a line for each check, with the checks that need attention first, and
+	// a line for each change a diff lists.
 	Text Format = "text"
 	// Markdown is for GitHub Job Summaries and pull request comments: the
-	// verdict, then a table of the checks, attention first.
+	// verdict, or a diff's number of changes, then a table of the checks,
+	// attention first, and a table of the changes a diff lists.
 	Markdown Format = "md"
 	// JSON is for programs: every field of the result, in step order. Its
 	// schemaVersion is 1.
@@ -29,11 +32,11 @@ const (
 // break a reader raises it.
 const SchemaVersion = 1
 
-// ErrFormat is the error ParseFormat and Write return for a format they
-// don't know.
+// ErrFormat is the error ParseFormat, Write and WriteDiff return for a
+// format they don't know.
 var ErrFormat = errors.New("unknown report format")
 
-// Formats returns the formats Write renders.
+// Formats returns the formats Write and WriteDiff render.
 func Formats() []Format {
 	return []Format{Text, Markdown, JSON}
 }
@@ -47,10 +50,10 @@ func ParseFormat(name string) (Format, error) {
 	if f := Format(name); slices.Contains(Formats(), f) {
 		return f, nil
 	}
-	return "", fmt.Errorf("%w %q: use text, md or json", ErrFormat, visible(cut(name, 40)))
+	return "", unknownFormat(name)
 }
 
-// Write renders r to w in format f.
+// Write renders a check's result to w in format f.
 func Write(w io.Writer, r *eval.Result, f Format) error {
 	switch f {
 	case Text:
@@ -58,9 +61,29 @@ func Write(w io.Writer, r *eval.Result, f Format) error {
 	case Markdown:
 		return writeMarkdown(w, r)
 	case JSON:
-		return writeJSON(w, r)
+		return writeJSON(w, toJSON(r))
 	}
-	return fmt.Errorf("%w %q: use text, md or json", ErrFormat, visible(cut(string(f), 40)))
+	return unknownFormat(string(f))
+}
+
+// WriteDiff renders a diff's result to w in format f: in text and
+// Markdown, the diff budgets and envelopes, then the changes; in JSON,
+// every field of the result.
+func WriteDiff(w io.Writer, r *diff.Result, f Format) error {
+	switch f {
+	case Text:
+		return writeDiffText(w, r)
+	case Markdown:
+		return writeDiffMarkdown(w, r)
+	case JSON:
+		return writeJSON(w, toJSONDiff(r))
+	}
+	return unknownFormat(string(f))
+}
+
+// unknownFormat is the error for a format named name that isn't one.
+func unknownFormat(name string) error {
+	return fmt.Errorf("%w %q: use text, md or json", ErrFormat, visible(cut(name, 40)))
 }
 
 // byAttention orders checks for a reader: those that block first, then

@@ -498,6 +498,28 @@ func TestShow(t *testing.T) {
 	}
 }
 
+func TestShowValue(t *testing.T) {
+	for _, tt := range []struct {
+		v    any
+		want string
+	}{
+		{nil, "null"},
+		{true, "true"},
+		{6000.0, "6000"},
+		{"a\"b", `"a\"b"`},
+		{[]any{1.0, "x", nil}, `[1, "x", null]`},
+		{map[string]any{"b": []any{}, "a": map[string]any{}}, `{"a": {}, "b": []}`},
+	} {
+		if got := ShowValue(tt.v, nil); got != tt.want {
+			t.Errorf("ShowValue(%v) = %q, want %q", tt.v, got, tt.want)
+		}
+	}
+	nested := map[string]any{"db": map[string]any{"password": "x", "host": "h"}, "tokens": []any{"t"}}
+	if got, want := ShowValue(nested, secretFields), `{"db": {"host": "h", "password": [redacted]}, "tokens": [redacted]}`; got != want {
+		t.Errorf("ShowValue(nested secrets) = %q, want %q", got, want)
+	}
+}
+
 // TestCostIsLinear guards against the quadratic cost tracking in cel-go
 // v0.30.0 that ADR-0014 works around: a comprehension over a long list
 // costs a few units per element, and takes milliseconds, not seconds.

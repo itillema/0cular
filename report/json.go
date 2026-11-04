@@ -67,11 +67,11 @@ type (
 	}
 )
 
-// writeJSON writes r as indented JSON, schemaVersion 1. HTML's < > & and
-// every character that isn't shown as itself are \u escapes, so the bytes
-// are safe to show in a terminal and to embed in HTML.
-func writeJSON(w io.Writer, r *eval.Result) error {
-	data, err := json.MarshalIndent(toJSON(r), "", "  ")
+// writeJSON writes a report as indented JSON. HTML's < > & and every
+// character that isn't shown as itself are \u escapes, so the bytes are
+// safe to show in a terminal and to embed in HTML.
+func writeJSON(w io.Writer, report any) error {
+	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return fmt.Errorf("report: %w", err)
 	}
@@ -85,13 +85,18 @@ func toJSON(r *eval.Result) jsonReport {
 		Verdict:       r.Verdict,
 		Contract:      jsonContract{Name: r.Contract, Digest: r.ContractDigest},
 		Candidate:     jsonArtifact(r.Candidate),
-		Checks:        make([]jsonCheck, 0, len(r.Checks)),
+		Checks:        toJSONChecks(r.Checks),
 	}
 	if r.Baseline != nil {
 		b := jsonArtifact(*r.Baseline)
 		out.Baseline = &b
 	}
-	for _, c := range r.Checks {
+	return out
+}
+
+func toJSONChecks(checks []eval.Check) []jsonCheck {
+	out := make([]jsonCheck, 0, len(checks))
+	for _, c := range checks {
 		jc := jsonCheck{
 			Kind:           c.Kind,
 			Name:           c.Name,
@@ -108,7 +113,7 @@ func toJSON(r *eval.Result) jsonReport {
 		if v := c.Budget; v != nil {
 			jc.Budget = toJSONBudget(v)
 		}
-		out.Checks = append(out.Checks, jc)
+		out = append(out, jc)
 	}
 	return out
 }

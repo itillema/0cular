@@ -57,6 +57,7 @@ func TestBinaryExitCodes(t *testing.T) {
 		{name: "contract schema", args: []string{"contract", "schema"}, wantCode: exitPass},
 		{name: "contract without a subcommand", args: []string{"contract"}, wantCode: exitUsage},
 		{name: "check without flags", args: []string{"check"}, wantCode: exitUsage},
+		{name: "diff without flags", args: []string{"diff"}, wantCode: exitUsage},
 		{name: "replay run", args: []string{"replay", "run"}, wantCode: exitPass},
 		{name: "replay run with an unknown scenario", args: []string{"replay", "run", "nope"}, wantCode: exitUsage},
 		{name: "replay without a subcommand", args: []string{"replay"}, wantCode: exitUsage},
@@ -127,6 +128,23 @@ func TestBinaryCheck(t *testing.T) {
 			"--candidate", filepath.Join(dir, candidate), "--baseline", filepath.Join(dir, "baseline.json"))
 		if code != wantCode {
 			t.Errorf("0cular check on %s exited with %d, want %d; output:\n%s", candidate, code, wantCode, out)
+		}
+	}
+}
+
+func TestBinaryDiff(t *testing.T) {
+	dir := diffTestFiles(t)
+	for candidate, wantCode := range map[string]int{
+		"over-budget.json": exitPass,
+		"zero-limit.json":  exitPass,
+		"broken.json":      exitBlock,
+		"too-large.json":   exitBlock,
+		"missing.json":     exitUsage,
+	} {
+		code, out := runBinary(t, "diff", "--contract", filepath.Join(dir, "contract.yaml"),
+			"--baseline", filepath.Join(dir, "baseline.json"), "--candidate", filepath.Join(dir, candidate))
+		if code != wantCode {
+			t.Errorf("0cular diff to %s exited with %d, want %d; output:\n%s", candidate, code, wantCode, out)
 		}
 	}
 }

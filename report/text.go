@@ -40,27 +40,39 @@ func writeText(w io.Writer, r *eval.Result) error {
 		b.WriteString("  no baseline")
 	}
 	b.WriteString("\n" + string(r.Verdict) + "\n")
-	checks := byAttention(r.Checks)
+	writeTextChecks(&b, r.Checks)
+	_, err := io.WriteString(w, b.String())
+	return err
+}
+
+// writeTextChecks writes a line for each check, those that need attention
+// first, with a line for each schema violation below its check.
+func writeTextChecks(b *strings.Builder, checks []eval.Check) {
+	checks = byAttention(checks)
 	width := 0
 	for _, c := range checks {
 		width = max(width, min(utf8.RuneCountInString(textField(c.Name, maxNameRunes)), maxNameColumn))
 	}
 	for _, c := range checks {
 		name := textField(c.Name, maxNameRunes)
-		fmt.Fprintf(&b, "  %s %-9s  %s", textSymbol(c.Status), c.Kind, name)
+		fmt.Fprintf(b, "  %s %-9s  %s", textSymbol(c.Status), c.Kind, name)
 		if detail := textDetail(c); detail != "" {
-			b.WriteString(strings.Repeat(" ", max(width-utf8.RuneCountInString(name), 0)) + "  " + detail)
+			b.WriteString(pad(name, width) + "  " + detail)
 		}
 		b.WriteString("\n")
 		for _, v := range c.Violations {
 			b.WriteString("      " + textField(describeViolation(v), maxDetailRunes) + "\n")
 		}
 		if more := c.ViolationCount - len(c.Violations); more > 0 {
-			fmt.Fprintf(&b, "      and %d more\n", more)
+			fmt.Fprintf(b, "      and %d more\n", more)
 		}
 	}
-	_, err := io.WriteString(w, b.String())
-	return err
+}
+
+// pad returns the spaces that line s up with a column width characters
+// wide.
+func pad(s string, width int) string {
+	return strings.Repeat(" ", max(width-utf8.RuneCountInString(s), 0))
 }
 
 // textField shows untrusted text on one line, cut to n characters.

@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "contract": {
+    "name": "bot-features",
+    "digest": "sha256:c0ffee0000000000000000000000000000000000000000000000000000000000"
+  },
+  "baseline": {
+    "key": "config/bot-features.json",
+    "size": 921,
+    "digest": "sha256:aa34000000000000000000000000000000000000000000000000000000000000"
+  },
+  "candidate": {
+    "key": "config/bot-features.json",
+    "size": 1843,
+    "digest": "sha256:bb12cd34ef56000000000000000000000000000000000000000000000000000"
+  },
+  "checks": [
+    {
+      "kind": "envelope",
+      "name": "baseline",
+      "status": "pass",
+      "message": "",
+      "evidence": "921 B ≤ 5 MiB; valid JSON",
+      "cost": 0,
+      "durationMs": 0.001
+    },
+    {
+      "kind": "envelope",
+      "name": "candidate",
+      "status": "pass",
+      "message": "",
+      "evidence": "1.8 KiB ≤ 5 MiB; valid JSON",
+      "cost": 0,
+      "durationMs": 0.001
+    },
+    {
+      "kind": "budget",
+      "name": "feature-count-stable",
+      "status": "needs-approval",
+      "message": "",
+      "evidence": "120 → 240 (+100%); budget ±20%",
+      "budget": {
+        "kind": "measure",
+        "baseline": 120,
+        "candidate": 240,
+        "breached": [
+          "maxChangePct"
+        ]
+      },
+      "cost": 4,
+      "durationMs": 0
+    },
+    {
+      "kind": "budget",
+      "name": "signing-key-stable",
+      "status": "pass",
+      "message": "",
+      "evidence": "[redacted] → [redacted]; budget ±0%",
+      "budget": {
+        "kind": "measure",
+        "redacted": true,
+        "breached": []
+      },
+      "cost": 2,
+      "durationMs": 0
+    }
+  ],
+  "compared": true,
+  "changes": {
+    "count": 123,
+    "added": 120,
+    "removed": 1,
+    "replaced": 2,
+    "operations": [
+      {
+        "op": "replace",
+        "path": "/features/0/weight",
+        "old": "0.5",
+        "new": "0.75"
+      },
+      {
+        "op": "add",
+        "path": "/features/-",
+        "new": "{\"name\": \"feature-121\", \"weight\": 0.5}"
+      },
+      {
+        "op": "remove",
+        "path": "/legacy",
+        "old": "true"
+      },
+      {
+        "op": "replace",
+        "path": "/signing/apiToken",
+        "old": "[redacted]",
+        "new": "[redacted]"
+      }
+    ]
+  }
+}

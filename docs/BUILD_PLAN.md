@@ -13,7 +13,7 @@ How the plan is kept:
 | --- | --- |
 | Current phase | Phase 1 — v0.1 "Check": in progress |
 | Last updated | 2026-11-03 |
-| Next task | 1.4 CLI: `diff`, the last command; `check`, `contract lint`, `contract schema`, `replay run` and `version` are done, with the exit codes. Done so far: 1.1 `contract`, 1.2 `eval`, 1.3 `report` and 1.7 replay |
+| Next task | 1.5 `gate` library: `Check` with bound approvals (§3.4). Done so far: 1.1 `contract`, 1.2 `eval`, 1.3 `report`, 1.4 CLI and 1.7 replay |
 | Blocked on | The maintainer's review of the work since Phase 1 began |
 | Latest release | None |
 | Planned releases | v0.1 Check, v0.2 Keep, v0.3 Publish, v0.4 Rings |
@@ -614,7 +614,7 @@ Estimates assume 8–10 hours a week. Each phase from Phase 1 on ends with a tag
 
   Fuzz the decoders and the evaluator; property-test the budget math.
 - [x] 1.3 `report`: text, Markdown and JSON (`schemaVersion: 1`) with evidence values, escaped as §3.12 requires, and secret values redacted (ADR-0015). Add golden-file tests, including the hostile values.
-- [ ] 1.4 CLI: `check` (with `--baseline` or `--no-baseline`), `diff`, `contract lint`, `contract schema`, `replay run` and `version`, with the exit codes in Appendix F.
+- [x] 1.4 CLI: `check` (with `--baseline` or `--no-baseline`), `diff`, `contract lint`, `contract schema`, `replay run` and `version`, with the exit codes in Appendix F.
 - [ ] 1.5 `gate` library: `Check` with bound approvals (§3.4), plus examples.
 - [ ] 1.6 GitHub Action (§3.11): the composite action in `action/`, the contract from the base ref, annotations and a Job Summary, and the optional two-workflow sticky comment. It builds from source until v0.1.0 exists.
 - [x] 1.7 Replay: the three scenarios BLOCK at `check`, with evidence that names the violated rule.

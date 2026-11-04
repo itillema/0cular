@@ -246,11 +246,8 @@ func (e *Evaluator) Check(ctx context.Context, candidate Input, baseline *Input)
 	if baseline != nil {
 		a := artifactOf(*baseline)
 		r.Baseline = &a
-		if base, check, err = e.envelope(ctx, "baseline", *baseline); err != nil {
+		if base, check, err = e.baselineEnvelope(ctx, *baseline); err != nil {
 			return nil, err
-		}
-		if check.Status.Blocks() {
-			check.Evidence = "the baseline doesn't decode under this contract: " + check.Evidence
 		}
 		r.Checks = append(r.Checks, check)
 	}
@@ -267,6 +264,24 @@ func (e *Evaluator) Check(ctx context.Context, candidate Input, baseline *Input)
 		}
 		r.Checks = append(r.Checks, check)
 	}
+	var baseVersion *version
+	if baseline != nil {
+		baseVersion = &version{base, baseline.Key}
+	}
+	budgets, err := e.budgetChecks(ctx, version{cand, candidate.Key}, baseVersion)
+	if err != nil {
+		return nil, err
+	}
+	r.Checks = append(r.Checks, budgets...)
+	r.Verdict = verdict(r.Checks)
+	return r, nil
+}
+
+// budgetChecks measures the diff budgets from base to cand. base is nil
+// when there's no baseline; a version's document is nil when it didn't
+// decode.
+func (e *Evaluator) budgetChecks(ctx context.Context, cand version, base *version) ([]Check, error) {
+	checks := make([]Check, 0, len(e.budgets))
 	d := diffs{}
 	for _, b := range e.budgets {
 		if err := ctx.Err(); err != nil {
@@ -274,25 +289,24 @@ func (e *Evaluator) Check(ctx context.Context, candidate Input, baseline *Input)
 		}
 		skip := ""
 		switch {
-		case cand == nil:
+		case cand.doc == nil:
 			skip = "the candidate didn't decode"
-		case baseline == nil:
-			skip = "there's no baseline to compare with"
 		case base == nil:
+			skip = "there's no baseline to compare with"
+		case base.doc == nil:
 			skip = "the baseline didn't decode"
 		}
-		var baseKey string
-		if baseline != nil {
-			baseKey = baseline.Key
+		var against version
+		if base != nil {
+			against = *base
 		}
-		check, err := e.budgetCheck(ctx, b, version{cand, candidate.Key}, version{base, baseKey}, skip, d)
+		check, err := e.budgetCheck(ctx, b, cand, against, skip, d)
 		if err != nil {
 			return nil, err
 		}
-		r.Checks = append(r.Checks, check)
+		checks = append(checks, check)
 	}
-	r.Verdict = verdict(r.Checks)
-	return r, nil
+	return checks, nil
 }
 
 func artifactOf(in Input) Artifact {
@@ -336,6 +350,17 @@ func (e *Evaluator) envelope(ctx context.Context, name string, in Input) (*Docum
 	}
 	check.Duration = time.Since(start)
 	return doc, check, nil
+}
+
+// baselineEnvelope decodes the baseline. Its evidence says that it's the
+// baseline that doesn't decode, which can surprise a reader whose change is
+// the candidate.
+func (e *Evaluator) baselineEnvelope(ctx context.Context, in Input) (*Document, Check, error) {
+	doc, check, err := e.envelope(ctx, "baseline", in)
+	if err == nil && check.Status.Blocks() {
+		check.Evidence = "the baseline doesn't decode under this contract: " + check.Evidence
+	}
+	return doc, check, err
 }
 
 // decodeEvidence describes a decode error, hiding the value it quotes when

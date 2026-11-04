@@ -4,7 +4,7 @@
 // revert.
 //
 // 0cular is pre-alpha. So far it has the check, contract lint, contract
-// schema, replay run and version commands.
+// schema, diff, replay run and version commands.
 //
 // Exit codes:
 //

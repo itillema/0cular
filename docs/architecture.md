@@ -2,7 +2,7 @@
 
 0cular gives config and data changes the safety net that code already has: it checks a change before it's published, keeps the last known good copy when a service loads it, and rolls changes out in rings with automatic revert. This page explains how the parts fit together. The [build plan](BUILD_PLAN.md) has the full design and the schedule, and the [ADRs](adr/README.md) record the decisions.
 
-> **Status: pre-alpha.** This describes the design. Today the repository has the gate's checks and reports, the `check`, `contract lint` and `replay run` commands, and the [replay suite](../replay/). The rest of v0.1 (`diff`, approvals and the GitHub Action) comes next, then the loader in v0.2, publishing in v0.3 and rings in v0.4.
+> **Status: pre-alpha.** This describes the design. Today the repository has the gate's checks and reports, the `check`, `diff`, `contract lint` and `replay run` commands, and the [replay suite](../replay/). The rest of v0.1 (approvals and the GitHub Action) comes next, then the loader in v0.2, publishing in v0.3 and rings in v0.4.
 
 ## Overview
 
@@ -183,6 +183,7 @@ cmd/0cular/   the CLI
 contract/     contract types and strict loading (v0.1)
 eval/         decoding, schema, CEL invariants, budgets and lint (v0.1)
 gate/         the check API and approvals (v0.1)
+diff/         measure deltas and a JSON Patch summary between two versions (v0.1)
 report/       text, Markdown and JSON reports (v0.1)
 action/       the GitHub Action (v0.1)
 loader/       the loader library (v0.2)

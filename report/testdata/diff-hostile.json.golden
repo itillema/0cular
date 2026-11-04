@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "contract": {
+    "name": "\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e",
+    "digest": "sha256:\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e"
+  },
+  "baseline": {
+    "key": "`code` and ``` fences ``` and ~~~",
+    "size": 1,
+    "digest": "sha256:\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e"
+  },
+  "candidate": {
+    "key": "a | b || c \\| d",
+    "size": 2,
+    "digest": "sha256:\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e"
+  },
+  "checks": [
+    {
+      "kind": "budget",
+      "name": "@octocat, @org/team, #123, owner/repo#45 and someone@example.com",
+      "status": "needs-approval",
+      "message": "line one\nline two\r\n\ttabbed",
+      "evidence": "\u001b[31mred\u001b[0m, NUL \u0000, DEL \u007f, NEL \u0085 and LS \u2028",
+      "budget": {
+        "kind": "measure",
+        "baseline": 0,
+        "candidate": 0,
+        "breached": [
+          "\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e"
+        ]
+      },
+      "cost": 0,
+      "durationMs": 0
+    },
+    {
+      "kind": "envelope",
+      "name": "\u202eevil\u202c, \u2066isolate\u2069, zero\u200bwidth, tag \udb40\udc41",
+      "status": "pass",
+      "message": "**bold** _em_ [link](https://example.com) ![img](https://example.com/x.png) # heading \u003e quote - item $math$ ~~strike~~ \u0026lt;entity\u0026gt; \u0026#64;",
+      "evidence": "bad \ufffd byte and \ufffd\ufffd truncated",
+      "cost": 0,
+      "durationMs": 0
+    }
+  ],
+  "compared": true,
+  "changes": {
+    "count": 6,
+    "added": 4,
+    "removed": 1,
+    "replaced": 1,
+    "operations": [
+      {
+        "op": "replace",
+        "path": "long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long ",
+        "old": "✓ 中文 👍 ok",
+        "new": "\u003cscript\u003ealert(1)\u003c/script\u003e \u003cimg src=x onerror=alert(1)\u003e"
+      },
+      {
+        "op": "add",
+        "path": "`code` and ``` fences ``` and ~~~",
+        "new": "@octocat, @org/team, #123, owner/repo#45 and someone@example.com"
+      },
+      {
+        "op": "remove",
+        "path": "line one\nline two\r\n\ttabbed",
+        "old": "\u001b[31mred\u001b[0m, NUL \u0000, DEL \u007f, NEL \u0085 and LS \u2028"
+      }
+    ]
+  }
+}

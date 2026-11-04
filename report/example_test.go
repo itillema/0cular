@@ -1,9 +1,12 @@
 package report_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 
+	"github.com/itillema/0cular/contract"
+	"github.com/itillema/0cular/diff"
 	"github.com/itillema/0cular/eval"
 	"github.com/itillema/0cular/report"
 )
@@ -30,6 +33,36 @@ func ExampleWrite() {
 	// BLOCK
 	//   ✗ invariant  feature-cap  size(self.features) = 240, not <= 200 — the proxy preallocates 200 features
 	//   ✓ envelope   candidate    1.8 KiB ≤ 5 MiB; valid JSON
+}
+
+func ExampleWriteDiff() {
+	c, err := contract.Parse([]byte("apiVersion: 0cular/v1alpha1\nkind: Contract\nmetadata: {name: rate-limits}\nartifact: {format: json, maxBytes: 64KiB}\n"))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	d, err := diff.New(c)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	r, err := d.Compare(context.Background(),
+		eval.Input{Data: []byte(`{"limits": {"login": 10, "search": 100}}`), Key: "limits.json"},
+		eval.Input{Data: []byte(`{"limits": {"login": 10, "search": 1000, "upload": 5}}`), Key: "limits.json"})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	if err := report.WriteDiff(os.Stdout, r, report.Text); err != nil {
+		fmt.Println(err)
+	}
+	// Output:
+	// 0cular diff  rate-limits  baseline limits.json sha256:0a190c388bc5…  candidate limits.json sha256:a0ed213677c7…
+	//   ✓ envelope   baseline   40 B ≤ 64 KiB; valid JSON
+	//   ✓ envelope   candidate  54 B ≤ 64 KiB; valid JSON
+	// 2 changes: 1 added and 1 replaced
+	//   replace  /limits/search  100 → 1000
+	//   add      /limits/upload  5
 }
 
 func ExampleParseFormat() {

@@ -45,7 +45,7 @@ func newRootCommand(stdout, stderr io.Writer) *cobra.Command {
 	}
 	root.SetOut(stdout)
 	root.SetErr(stderr)
-	root.AddCommand(newCheckCommand(), newContractCommand(), newReplayCommand(), newVersionCommand())
+	root.AddCommand(newCheckCommand(), newContractCommand(), newDiffCommand(), newReplayCommand(), newVersionCommand())
 	tagCommandErrors(root)
 	return root
 }

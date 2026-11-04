@@ -253,6 +253,13 @@ func Show(v ref.Val, redact Redact) string {
 	return cut(b.String(), maxShownRunes)
 }
 
+// ShowValue renders a value of a decoded artifact, as Show renders a CEL
+// value: nil, a bool, a float64, a string, a []any or a map[string]any,
+// nested.
+func ShowValue(v any, redact Redact) string {
+	return Show(types.DefaultTypeAdapter.NativeToValue(v), redact)
+}
+
 // writeValue writes v, stopping early once b holds more than it can show.
 func writeValue(b *strings.Builder, v ref.Val, hide Redact) {
 	if b.Len() > 4*maxShownRunes {

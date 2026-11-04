@@ -1,4 +1,5 @@
-// Package report renders an eval.Result as text, Markdown or JSON.
+// Package report renders a check's eval.Result, or a diff's diff.Result, as
+// text, Markdown or JSON.
 //
 // Every string in a result can come from untrusted input: an artifact's
 // keys and values, a contract's messages, file paths. So each format
@@ -14,5 +15,6 @@
 //     a report is safe to show and to embed.
 //
 // Evidence arrives with secrets already hidden: eval shows [redacted] in
-// place of values read through fields that hold secrets (ADR-0015).
+// place of values read through fields that hold secrets (ADR-0015), and
+// diff does the same in the changes it lists.
 package report

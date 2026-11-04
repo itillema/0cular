@@ -1,0 +1,11 @@
+0cular diff  bot-features  baseline config/bot-features.json sha256:aa3400000000…  candidate config/bot-features.json sha256:bb12cd34ef56…
+  ! budget     feature-count-stable  120 → 240 (+100%); budget ±20% (needs approval)
+  ✓ envelope   baseline              921 B ≤ 5 MiB; valid JSON
+  ✓ envelope   candidate             1.8 KiB ≤ 5 MiB; valid JSON
+  ✓ budget     signing-key-stable    [redacted] → [redacted]; budget ±0%
+123 changes: 120 added, 1 removed and 2 replaced
+  replace  /features/0/weight  0.5 → 0.75
+  add      /features/-         {"name": "feature-121", "weight": 0.5}
+  remove   /legacy             true
+  replace  /signing/apiToken   [redacted] → [redacted]
+  and 119 more
