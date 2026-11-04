@@ -8,3 +8,6 @@
 *.test
 *.prof
 coverage.*
+
+# Failure files that rapid writes when a property test fails
+**/testdata/rapid/

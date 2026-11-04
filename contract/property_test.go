@@ -15,6 +15,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"pgregory.net/rapid"
 
+	"github.com/itillema/0cular/internal/redact"
 	"github.com/itillema/0cular/internal/yamlx"
 )
 
@@ -239,6 +240,15 @@ func genContract(t *rapid.T) (*Contract, string) {
 		if len(onFailure) > 0 {
 			top = append(top, entry{key: "onFailure", mapping: shuffle(t, onFailure, "onFailure")})
 		}
+	}
+	if rapid.Bool().Draw(t, "set report") {
+		patterns := rapid.SliceOfNDistinct(rapid.StringMatching(`[A-Za-z][A-Za-z0-9_-]{0,10}`), 0, 4, redact.Normalize).Draw(t, "redact")
+		quoted := make([]string, len(patterns))
+		for i, p := range patterns {
+			quoted[i] = strconv.Quote(p)
+		}
+		c.Report.Redact = patterns
+		top = append(top, entry{key: "report", mapping: []entry{{key: "redact", scalar: "[" + strings.Join(quoted, ", ") + "]"}}})
 	}
 
 	var b strings.Builder

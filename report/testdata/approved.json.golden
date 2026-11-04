@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "verdict": "PASS",
+  "contract": {
+    "name": "bot-features",
+    "digest": "sha256:c0ffee0000000000000000000000000000000000000000000000000000000000"
+  },
+  "candidate": {
+    "key": "config/bot-features.json",
+    "size": 1843,
+    "digest": "sha256:bb12cd34ef56000000000000000000000000000000000000000000000000000"
+  },
+  "baseline": {
+    "key": "config/bot-features.json",
+    "size": 921,
+    "digest": "sha256:aa34000000000000000000000000000000000000000000000000000000000000"
+  },
+  "approvals": [
+    {
+      "by": "bob",
+      "reason": "an earlier draft",
+      "expires": "2026-11-05T12:00:00Z",
+      "candidateDigest": "sha256:ab00000000000000000000000000000000000000000000000000000000000000",
+      "contractDigest": "sha256:c0ffee0000000000000000000000000000000000000000000000000000000000",
+      "budgets": [
+        "feature-count-stable"
+      ],
+      "applied": false,
+      "rejection": "it's for another candidate"
+    },
+    {
+      "by": "alice",
+      "reason": "the feature list doubles on purpose",
+      "expires": "2026-11-05T12:00:00Z",
+      "candidateDigest": "sha256:bb12cd34ef56000000000000000000000000000000000000000000000000000",
+      "contractDigest": "sha256:c0ffee0000000000000000000000000000000000000000000000000000000000",
+      "budgets": [
+        "feature-count-stable"
+      ],
+      "applied": true,
+      "rejection": ""
+    }
+  ],
+  "checks": [
+    {
+      "kind": "envelope",
+      "name": "candidate",
+      "status": "pass",
+      "message": "",
+      "evidence": "1.8 KiB ≤ 5 MiB; valid JSON",
+      "cost": 0,
+      "durationMs": 0
+    },
+    {
+      "kind": "envelope",
+      "name": "baseline",
+      "status": "pass",
+      "message": "",
+      "evidence": "921 B ≤ 5 MiB; valid JSON",
+      "cost": 0,
+      "durationMs": 0
+    },
+    {
+      "kind": "invariant",
+      "name": "feature-cap",
+      "status": "pass",
+      "message": "the proxy preallocates 200 features",
+      "evidence": "",
+      "cost": 3,
+      "durationMs": 0
+    },
+    {
+      "kind": "budget",
+      "name": "feature-count-stable",
+      "status": "approved",
+      "message": "",
+      "evidence": "120 → 240 (+100%); budget ±20%",
+      "budget": {
+        "kind": "measure",
+        "baseline": 120,
+        "candidate": 240,
+        "breached": [
+          "maxChangePct"
+        ]
+      },
+      "cost": 4,
+      "durationMs": 0
+    }
+  ]
+}

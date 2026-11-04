@@ -15,6 +15,7 @@ import (
 
 	"github.com/itillema/0cular/contract"
 	"github.com/itillema/0cular/internal/celenv"
+	"github.com/itillema/0cular/internal/redact"
 )
 
 // BudgetValues are what a diff budget measured. Reports show them, and an
@@ -22,6 +23,9 @@ import (
 type BudgetValues struct {
 	// Baseline and Candidate are a measure budget's values.
 	Baseline, Candidate float64
+	// Collection is set for a collection budget, whose values are the
+	// counts below; a measure budget's are Baseline and Candidate.
+	Collection bool
 	// BaselineItems and CandidateItems are how many items a collection
 	// budget's lists hold; Removed, Added and Changed count the items the
 	// candidate removed, added and changed, matched by key.
@@ -30,6 +34,9 @@ type BudgetValues struct {
 	// Breached lists the limits the change exceeds, by their names in the
 	// contract, such as maxChangePct.
 	Breached []string
+	// Redacted is set when a measure reads a field that holds a secret
+	// (ADR-0015). Reports then show neither Baseline nor Candidate.
+	Redacted bool
 }
 
 type compiledBudget struct {
@@ -38,8 +45,12 @@ type compiledBudget struct {
 	measure *celenv.Program
 	// collection evaluates a collection budget's collection, and keys
 	// evaluates its elements' keys, in one evaluation rather than one per
-	// element.
-	collection, keys *celenv.Program
+	// element. key is the key alone, which Lint checks.
+	collection, keys, key *celenv.Program
+	// secretMeasure and secretKeys are set when the measure, or the
+	// collection or its key, reads a field that holds a secret, so evidence
+	// hides the values they yield (ADR-0015).
+	secretMeasure, secretKeys bool
 }
 
 // envs are the CEL environments a contract's expressions compile in.
@@ -47,9 +58,27 @@ type envs struct {
 	rules, keys, items *celenv.Env
 }
 
+// newEnvs returns the environments, with the default limits.
+func newEnvs() (envs, error) {
+	rules, err := celenv.New(celenv.Rules, celenv.Limits{})
+	if err != nil {
+		return envs{}, err
+	}
+	keys, err := celenv.New(celenv.Keys, celenv.Limits{})
+	if err != nil {
+		return envs{}, err
+	}
+	items, err := celenv.New(celenv.Items, celenv.Limits{})
+	if err != nil {
+		return envs{}, err
+	}
+	return envs{rules: rules, keys: keys, items: items}, nil
+}
+
 // compileBudget compiles a budget's expressions. A collection's key is
 // compiled alone too, in an environment with only item, so that it can't
-// read anything else.
+// read anything else. The budget holds every expression that compiled, for
+// Lint, even when another didn't.
 func compileBudget(c *contract.Contract, i int, b contract.DiffBudget, env envs) (compiledBudget, []contract.Problem) {
 	path := fmt.Sprintf("diffBudgets[%d]", i)
 	cb := compiledBudget{DiffBudget: b}
@@ -66,19 +95,21 @@ func compileBudget(c *contract.Contract, i int, b contract.DiffBudget, env envs)
 	if err != nil {
 		problems = append(problems, expressionProblems(c, path+".collection", err)...)
 	}
-	if _, err := env.keys.Compile(b.Key, celenv.Any); err != nil {
+	key, err := env.keys.Compile(b.Key, celenv.Any)
+	if err != nil {
 		problems = append(problems, expressionProblems(c, path+".key", err)...)
 	}
+	cb.collection, cb.key = collection, key
 	if len(problems) > 0 {
 		return cb, problems
 	}
 	// The key compiled alone above, where only item exists. The line break
 	// ends any comment at the end of it.
-	keyList, err := env.items.Compile("items.map(item, "+b.Key+"\n)", celenv.List)
+	keys, err := env.items.Compile("items.map(item, "+b.Key+"\n)", celenv.List)
 	if err != nil {
 		return cb, expressionProblems(c, path+".key", err)
 	}
-	cb.collection, cb.keys = collection, keyList
+	cb.keys = keys
 	return cb, nil
 }
 
@@ -161,7 +192,7 @@ func (e *Evaluator) measureChange(ctx context.Context, b compiledBudget, cand, b
 	if err != nil {
 		return nil, ccost + bcost, fmt.Errorf("on the baseline: %w", err)
 	}
-	return &BudgetValues{Baseline: bv, Candidate: cv, Breached: measureBreaches(b.DiffBudget, bv, cv)}, ccost + bcost, nil
+	return &BudgetValues{Baseline: bv, Candidate: cv, Breached: measureBreaches(b.DiffBudget, bv, cv), Redacted: b.secretMeasure}, ccost + bcost, nil
 }
 
 func (e *Evaluator) number(ctx context.Context, p *celenv.Program, v version) (float64, uint64, error) {
@@ -244,6 +275,7 @@ func (e *Evaluator) collectionChange(ctx context.Context, b compiledBudget, cand
 		return nil, cost, diff.err
 	}
 	v := &BudgetValues{
+		Collection:    true,
 		BaselineItems: diff.baseItems, CandidateItems: diff.candItems,
 		Removed: diff.removed, Added: diff.added, Changed: diff.changed,
 	}
@@ -302,10 +334,10 @@ func (e *Evaluator) items(ctx context.Context, b compiledBudget, v version) (map
 		case err != nil:
 			return nil, cost, fmt.Errorf("the key of item %d failed: %w", i, err)
 		case !ok:
-			return nil, cost, fmt.Errorf("the key of item %d, %s, can't equal anything", i, celenv.Show(key))
+			return nil, cost, fmt.Errorf("the key of item %d, %s, can't equal anything", i, e.showKey(b, key))
 		}
 		if _, dup := items[k]; dup {
-			return nil, cost, fmt.Errorf("two items have the key %s", celenv.Show(key))
+			return nil, cost, fmt.Errorf("two items have the key %s", e.showKey(b, key))
 		}
 		if native != nil {
 			items[k] = native[i]
@@ -314,6 +346,15 @@ func (e *Evaluator) items(ctx context.Context, b compiledBudget, v version) (map
 		}
 	}
 	return items, cost, nil
+}
+
+// showKey renders a collection key for evidence, or [redacted] if the keys
+// come from a field that holds a secret.
+func (e *Evaluator) showKey(b compiledBudget, key ref.Val) string {
+	if b.secretKeys {
+		return redact.Marker
+	}
+	return celenv.Show(key, e.redact.Field)
 }
 
 // diffItems counts the keys only base holds, the keys only cand holds, and
@@ -420,6 +461,9 @@ func measureEvidence(b contract.DiffBudget, v *BudgetValues) string {
 	}
 	if b.MaxDecrease != nil {
 		limits = append(limits, "-"+celenv.FormatNumber(*b.MaxDecrease))
+	}
+	if v.Redacted {
+		return fmt.Sprintf("%s → %s; budget %s", redact.Marker, redact.Marker, strings.Join(limits, ", "))
 	}
 	return fmt.Sprintf("%s → %s (%s); budget %s", celenv.FormatNumber(v.Baseline), celenv.FormatNumber(v.Candidate),
 		strings.Join(change, ", "), strings.Join(limits, ", "))

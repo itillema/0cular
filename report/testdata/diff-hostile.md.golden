@@ -1,0 +1,18 @@
+### 0cular diff: 6 changes
+
+Contract \<script\>alert\(1\)\</script\> \<img src=x onerror=alert\(1\)\> · baseline \`code\` and \`\`\` fences \`\`\` and \~\~\~ (sha256:\<script\>aler…) · candidate a \| b \|\| c \\\| d (sha256:\<script\>aler…)
+
+| | Kind | Check | Evidence |
+| --- | --- | --- | --- |
+| ⚠️ | budget | @&#8203;octocat, @&#8203;org/team, \#&#8203;123, owner/repo\#&#8203;45 and someone@&#8203;example\.com | \\x1b\[31mred\\x1b\[0m, NUL \\x00, DEL \\x7f, NEL \\u0085 and LS \\u2028 — line one\\nline two\\r\\n\\ttabbed \(needs approval\) |
+| ✅ | envelope | \\u202eevil\\u202c, \\u2066isolate\\u2069, zero\\u200bwidth, tag \\U000e0041 | bad \\xff byte and \\xe2\\x80 truncated |
+
+6 changes: 4 added, 1 removed and 1 replaced
+
+| Op | Path | Old | New |
+| --- | --- | --- | --- |
+| replace | long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long… | ✓ 中文 👍 ok | \<script\>alert\(1\)\</script\> \<img src=x onerror=alert\(1\)\> |
+| add | \`code\` and \`\`\` fences \`\`\` and \~\~\~ |  | @&#8203;octocat, @&#8203;org/team, \#&#8203;123, owner/repo\#&#8203;45 and someone@&#8203;example\.com |
+| remove | line one\\nline two\\r\\n\\ttabbed | \\x1b\[31mred\\x1b\[0m, NUL \\x00, DEL \\x7f, NEL \\u0085 and LS \\u2028 |  |
+
+And 3 more.

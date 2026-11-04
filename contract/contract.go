@@ -35,6 +35,8 @@ type Contract struct {
 	Invariants []Invariant
 	// DiffBudgets bound change from the baseline to the candidate.
 	DiffBudgets []DiffBudget
+	// Report sets what reports show of the artifact.
+	Report Report
 	// OnFailure says what a loader does when a version fails.
 	OnFailure OnFailure
 
@@ -151,6 +153,23 @@ type DiffBudget struct {
 func (b DiffBudget) IsCollection() bool {
 	return b.Collection != ""
 }
+
+// Report sets what reports show of an artifact.
+type Report struct {
+	// Redact lists field-name patterns whose values reports hide, in
+	// addition to the built-in ones, such as password and token
+	// (ADR-0015). A field matches when its name contains a pattern,
+	// ignoring case and everything but letters and digits.
+	Redact []string
+}
+
+// Limits on report.redact.
+const (
+	// MaxRedactPatterns is how many patterns report.redact may hold.
+	MaxRedactPatterns = 64
+	// MaxRedactPatternRunes is how long each pattern may be.
+	MaxRedactPatternRunes = 64
+)
 
 // Policy is what a loader does when it has no last known good to keep.
 type Policy string

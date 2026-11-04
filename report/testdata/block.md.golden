@@ -1,0 +1,21 @@
+### 0cular check: ❌ BLOCK
+
+Contract bot\-features · candidate config/bot\-features\.json (sha256:bb12cd34ef56…) · baseline config/bot\-features\.json (sha256:aa3400000000…)
+
+| | Kind | Check | Evidence |
+| --- | --- | --- | --- |
+| ❌ | schema | bot\-features\.schema\.json | at /features/3/name: does not match pattern '^feature\-\[0\-9\]\+\$'; and 2 more |
+| ❌ | invariant | feature\-cap | size\(self\.features\) = 240, not \<= 200 — the proxy preallocates 200 features |
+| ❌ | invariant | unique\-names | the expression exceeded its cost limit of 1000000 \(error\) |
+| ⚠️ | budget | feature\-count\-stable | 120 → 240 \(\+100%\); budget ±20% \(needs approval\) |
+| ✅ | envelope | candidate | 1\.8 KiB ≤ 5 MiB; valid JSON |
+| ✅ | envelope | baseline | 921 B ≤ 5 MiB; valid JSON |
+| ✅ | invariant | every\-feature\-named |  |
+| ✅ | budget | feature\-churn | 120 → 240 items: 0 removed, 120 added, 0 changed \(0%\); budget at most 5 removed |
+| ✅ | budget | pin\-stable | \[redacted\] → \[redacted\]; budget ±1% |
+
+Schema violations in bot\-features\.schema\.json:
+
+- at /features/3/name: does not match pattern '^feature\-\[0\-9\]\+\$'
+- at /features/7: missing property 'weight'
+- and 1 more

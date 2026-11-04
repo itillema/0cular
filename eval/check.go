@@ -17,6 +17,7 @@ import (
 
 	"github.com/itillema/0cular/contract"
 	"github.com/itillema/0cular/internal/celenv"
+	"github.com/itillema/0cular/internal/redact"
 )
 
 // Verdict is the outcome of checking a candidate.
@@ -59,6 +60,9 @@ const (
 	// StatusNeedsApproval means a diff budget was breached, and an
 	// approval can accept it.
 	StatusNeedsApproval Status = "needs-approval"
+	// StatusApproved means a diff budget was breached, and an approval
+	// accepted it. gate.Check sets it; Evaluator.Check never does.
+	StatusApproved Status = "approved"
 	// StatusSkipped means the check didn't run, such as when the candidate
 	// didn't decode.
 	StatusSkipped Status = "skipped"
@@ -125,15 +129,25 @@ type Result struct {
 	// Checks holds every check, ordered by step and then as the contract
 	// lists them.
 	Checks []Check
+	// Approvals lists the approvals given for the candidate, in the order
+	// they were given, and whether each applied. gate.Check fills it;
+	// Evaluator.Check leaves it empty.
+	Approvals []ApprovalOutcome
 }
 
 // Input is one version of an artifact to check.
 type Input struct {
-	// Data is the version's bytes.
+	// Data is the version's bytes, or, for a version larger than the
+	// contract's maxBytes, the first maxBytes+1 of them.
 	Data []byte
 	// Key is the artifact's key in its store, or its file path. Rules read
 	// it as meta.key.
 	Key string
+	// Size and Digest are the whole version's, as ReadInput sets them. Check
+	// uses them only when Data holds just the start of the version, and
+	// otherwise computes both from Data.
+	Size   int64
+	Digest string
 }
 
 // Evaluator checks candidates against one contract. New compiles the
@@ -144,6 +158,8 @@ type Evaluator struct {
 	schema     *Schema
 	invariants []compiledInvariant
 	budgets    []compiledBudget
+	// redact matches the fields whose values evidence hides (ADR-0015).
+	redact *redact.Matcher
 }
 
 type compiledInvariant struct {
@@ -156,15 +172,7 @@ type compiledInvariant struct {
 // compile is a problem with the contract: New returns a *contract.Error
 // that places each problem in the contract file.
 func New(c *contract.Contract) (*Evaluator, error) {
-	env, err := celenv.New(celenv.Rules, celenv.Limits{})
-	if err != nil {
-		return nil, err
-	}
-	keys, err := celenv.New(celenv.Keys, celenv.Limits{})
-	if err != nil {
-		return nil, err
-	}
-	items, err := celenv.New(celenv.Items, celenv.Limits{})
+	env, err := newEnvs()
 	if err != nil {
 		return nil, err
 	}
@@ -173,10 +181,10 @@ func New(c *contract.Contract) (*Evaluator, error) {
 	if err != nil {
 		problems = append(problems, contract.Problem{Pos: c.Position("schema.jsonSchema"), Path: "schema.jsonSchema", Message: err.Error()})
 	}
-	e := &Evaluator{contract: c, schema: schema}
+	e := &Evaluator{contract: c, schema: schema, redact: redact.New(c.Report.Redact)}
 	for i, inv := range c.Invariants {
 		path := fmt.Sprintf("invariants[%d].expr", i)
-		program, err := env.Compile(inv.Expr, celenv.Bool)
+		program, err := env.rules.Compile(inv.Expr, celenv.Bool)
 		if err != nil {
 			problems = append(problems, expressionProblems(c, path, err)...)
 			continue
@@ -184,8 +192,11 @@ func New(c *contract.Contract) (*Evaluator, error) {
 		e.invariants = append(e.invariants, compiledInvariant{Invariant: inv, program: program})
 	}
 	for i, b := range c.DiffBudgets {
-		budget, budgetProblems := compileBudget(c, i, b, envs{rules: env, keys: keys, items: items})
+		budget, budgetProblems := compileBudget(c, i, b, env)
 		problems = append(problems, budgetProblems...)
+		budget.secretMeasure = budget.measure != nil && budget.measure.ReadsRedacted(e.redact.Field)
+		budget.secretKeys = budget.collection != nil && budget.key != nil &&
+			(budget.collection.ReadsRedacted(e.redact.Field) || budget.key.ReadsRedacted(e.redact.Field))
 		e.budgets = append(e.budgets, budget)
 	}
 	if len(problems) > 0 {
@@ -206,13 +217,18 @@ func expressionProblems(c *contract.Contract, path string, err error) []contract
 	}
 	problems := make([]contract.Problem, len(ce.Problems))
 	for i, p := range ce.Problems {
-		message := strings.TrimSuffix(p.Message, " (in container '')")
-		if p.Line > 0 {
-			message = fmt.Sprintf("at %d:%d in the expression: %s", p.Line, p.Column, message)
-		}
-		problems[i] = contract.Problem{Pos: c.Position(path), Path: path, Message: message}
+		problems[i] = contract.Problem{Pos: c.Position(path), Path: path, Message: inExpression(p)}
 	}
 	return problems
+}
+
+// inExpression returns a problem's message, after its place in the
+// expression when it has one.
+func inExpression(p celenv.Problem) string {
+	if p.Line > 0 {
+		return fmt.Sprintf("at %d:%d in the expression: %s", p.Line, p.Column, p.Message)
+	}
+	return p.Message
 }
 
 // Check checks candidate against the contract, and against baseline when
@@ -237,11 +253,8 @@ func (e *Evaluator) Check(ctx context.Context, candidate Input, baseline *Input)
 	if baseline != nil {
 		a := artifactOf(*baseline)
 		r.Baseline = &a
-		if base, check, err = e.envelope(ctx, "baseline", *baseline); err != nil {
+		if base, check, err = e.baselineEnvelope(ctx, *baseline); err != nil {
 			return nil, err
-		}
-		if check.Status.Blocks() {
-			check.Evidence = "the baseline doesn't decode under this contract: " + check.Evidence
 		}
 		r.Checks = append(r.Checks, check)
 	}
@@ -258,6 +271,24 @@ func (e *Evaluator) Check(ctx context.Context, candidate Input, baseline *Input)
 		}
 		r.Checks = append(r.Checks, check)
 	}
+	var baseVersion *version
+	if baseline != nil {
+		baseVersion = &version{base, baseline.Key}
+	}
+	budgets, err := e.budgetChecks(ctx, version{cand, candidate.Key}, baseVersion)
+	if err != nil {
+		return nil, err
+	}
+	r.Checks = append(r.Checks, budgets...)
+	r.Verdict = verdict(r.Checks)
+	return r, nil
+}
+
+// budgetChecks measures the diff budgets from base to cand. base is nil
+// when there's no baseline; a version's document is nil when it didn't
+// decode.
+func (e *Evaluator) budgetChecks(ctx context.Context, cand version, base *version) ([]Check, error) {
+	checks := make([]Check, 0, len(e.budgets))
 	d := diffs{}
 	for _, b := range e.budgets {
 		if err := ctx.Err(); err != nil {
@@ -265,28 +296,30 @@ func (e *Evaluator) Check(ctx context.Context, candidate Input, baseline *Input)
 		}
 		skip := ""
 		switch {
-		case cand == nil:
+		case cand.doc == nil:
 			skip = "the candidate didn't decode"
-		case baseline == nil:
-			skip = "there's no baseline to compare with"
 		case base == nil:
+			skip = "there's no baseline to compare with"
+		case base.doc == nil:
 			skip = "the baseline didn't decode"
 		}
-		var baseKey string
-		if baseline != nil {
-			baseKey = baseline.Key
+		var against version
+		if base != nil {
+			against = *base
 		}
-		check, err := e.budgetCheck(ctx, b, version{cand, candidate.Key}, version{base, baseKey}, skip, d)
+		check, err := e.budgetCheck(ctx, b, cand, against, skip, d)
 		if err != nil {
 			return nil, err
 		}
-		r.Checks = append(r.Checks, check)
+		checks = append(checks, check)
 	}
-	r.Verdict = verdict(r.Checks)
-	return r, nil
+	return checks, nil
 }
 
 func artifactOf(in Input) Artifact {
+	if in.partial() {
+		return Artifact{Key: in.Key, Size: in.Size, Digest: in.Digest}
+	}
 	sum := sha256.Sum256(in.Data)
 	return Artifact{Key: in.Key, Size: int64(len(in.Data)), Digest: "sha256:" + hex.EncodeToString(sum[:])}
 }
@@ -296,8 +329,18 @@ func artifactOf(in Input) Artifact {
 func (e *Evaluator) envelope(ctx context.Context, name string, in Input) (*Document, Check, error) {
 	start := time.Now()
 	a := e.contract.Artifact
-	doc, err := Decode(ctx, in.Data, a)
 	check := Check{Kind: KindEnvelope, Name: name}
+	if in.partial() {
+		// ReadInput kept only the start of a version too large to decode.
+		check.Status, check.Evidence = StatusFail, tooLarge(in.Size, a.MaxBytes).Error()
+		if in.Size <= a.MaxBytes {
+			check.Status = StatusError
+			check.Evidence = fmt.Sprintf("only %d of the version's %d bytes were read; read it with ReadInput and this contract", len(in.Data), in.Size)
+		}
+		check.Duration = time.Since(start)
+		return nil, check, nil
+	}
+	doc, err := Decode(ctx, in.Data, a)
 	var de *DecodeError
 	switch {
 	case err == nil:
@@ -305,7 +348,7 @@ func (e *Evaluator) envelope(ctx context.Context, name string, in Input) (*Docum
 		check.Evidence = fmt.Sprintf("%s ≤ %s; valid %s", FormatSize(doc.Size), FormatSize(a.MaxBytes), strings.ToUpper(string(a.Format)))
 	case errors.As(err, &de):
 		check.Status = StatusFail
-		check.Evidence = de.Error()
+		check.Evidence = e.decodeEvidence(de)
 	case ctx.Err() != nil:
 		return nil, Check{}, ctx.Err()
 	default:
@@ -314,6 +357,29 @@ func (e *Evaluator) envelope(ctx context.Context, name string, in Input) (*Docum
 	}
 	check.Duration = time.Since(start)
 	return doc, check, nil
+}
+
+// baselineEnvelope decodes the baseline. Its evidence says that it's the
+// baseline that doesn't decode, which can surprise a reader whose change is
+// the candidate.
+func (e *Evaluator) baselineEnvelope(ctx context.Context, in Input) (*Document, Check, error) {
+	doc, check, err := e.envelope(ctx, "baseline", in)
+	if err == nil && check.Status.Blocks() {
+		check.Evidence = "the baseline doesn't decode under this contract: " + check.Evidence
+	}
+	return doc, check, err
+}
+
+// decodeEvidence describes a decode error, hiding the value it quotes when
+// the value's field holds a secret.
+func (e *Evaluator) decodeEvidence(de *DecodeError) string {
+	if de.Value == "" || !e.redact.Pointer(de.Pointer) {
+		return de.Error()
+	}
+	hidden := *de
+	hidden.Message = strings.Replace(de.Message, de.Value, redact.Marker, 1)
+	hidden.Value = redact.Marker
+	return hidden.Error()
 }
 
 func (e *Evaluator) schemaCheck(cand *Document) Check {
@@ -328,6 +394,12 @@ func (e *Evaluator) schemaCheck(cand *Document) Check {
 	if total == 0 {
 		check.Status = StatusPass
 		return check
+	}
+	for i, v := range violations {
+		// A message can quote the value, such as one that fails a pattern.
+		if e.redact.Pointer(v.Pointer) {
+			violations[i].Message = redact.Marker + " fails the schema's " + keywordName(v.Keyword)
+		}
 	}
 	check.Status, check.Violations, check.ViolationCount = StatusFail, violations, total
 	check.Evidence = describeViolation(violations[0])
@@ -363,12 +435,22 @@ func (e *Evaluator) invariantCheck(ctx context.Context, inv compiledInvariant, c
 		check.Status = StatusPass
 	default:
 		check.Status = StatusFail
-		if check.Evidence = inv.program.Explain(ctx, vars); check.Evidence == "" {
+		if check.Evidence = inv.program.Explain(ctx, vars, e.redact.Field); check.Evidence == "" {
 			check.Evidence = inv.Expr + " is false"
 		}
 	}
 	check.Duration = time.Since(start)
 	return check, nil
+}
+
+// keywordName returns the name of the schema keyword a JSON Pointer points
+// to, such as pattern for /properties/token/pattern.
+func keywordName(pointer string) string {
+	name := pointer[strings.LastIndexByte(pointer, '/')+1:]
+	if name == "" {
+		return "rules"
+	}
+	return strings.ReplaceAll(strings.ReplaceAll(name, "~1", "/"), "~0", "~")
 }
 
 // meta returns the meta variable for doc.

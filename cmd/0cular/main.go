@@ -3,7 +3,8 @@
 // good copy when loading, and rolls changes out in rings with automatic
 // revert.
 //
-// 0cular is pre-alpha. So far it has only the version command.
+// 0cular is pre-alpha. So far it has the check, contract lint, contract
+// schema, diff, replay run and version commands.
 //
 // Exit codes:
 //

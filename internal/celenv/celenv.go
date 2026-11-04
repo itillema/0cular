@@ -123,7 +123,10 @@ type Limits struct {
 // Env compiles contract expressions.
 type Env struct {
 	env    *cel.Env
+	kind   Kind
 	limits Limits
+	// names are what an expression can refer to, for suggestions.
+	names []string
 }
 
 // New returns an environment of the given kind. Limits above the defaults
@@ -168,7 +171,7 @@ func New(kind Kind, limits Limits) (*Env, error) {
 	if err != nil {
 		return nil, fmt.Errorf("celenv: %w", err)
 	}
-	return &Env{env: env, limits: limits}, nil
+	return &Env{env: env, kind: kind, limits: limits, names: namesOf(env)}, nil
 }
 
 // Result is the kind of value an expression must return.
@@ -248,11 +251,7 @@ type Program struct {
 func (e *Env) Compile(expr string, want Result) (*Program, error) {
 	ast, issues := e.env.Compile(expr)
 	if issues != nil && issues.Err() != nil {
-		var problems []Problem
-		for _, ce := range issues.Errors() {
-			problems = append(problems, problemAt(ce.Location, ce.Message))
-		}
-		return nil, &CompileError{Problems: problems}
+		return nil, &CompileError{Problems: e.problems(issues.Errors())}
 	}
 	if problems := checkMeta(ast); len(problems) > 0 {
 		return nil, &CompileError{Problems: problems}

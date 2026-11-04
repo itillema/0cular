@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -262,6 +263,40 @@ diffBudgets:
 func sameCounts(a, b *BudgetValues) bool {
 	return a.BaselineItems == b.BaselineItems && a.CandidateItems == b.CandidateItems &&
 		a.Removed == b.Removed && a.Added == b.Added && a.Changed == b.Changed
+}
+
+// FuzzLint lints a contract with a fuzzed JSON Schema and a fuzzed
+// invariant. Lint must not fail or panic, and each finding must have a
+// severity, a field and a message.
+func FuzzLint(f *testing.F) {
+	for _, seed := range [][2]string{
+		{`{"type": "object", "properties": {"items": {"type": "array", "maxItems": 10, "items": {"$ref": "#/$defs/i"}}}, "$defs": {"i": {"properties": {"name": {"format": "date_time"}}}}}`, "self.items.all(i, i.name.matches('^a'))"},
+		{`{"allOf": [{"$ref": "#"}, {"maxProperties": 3}], "propertyNames": {"maxLength": 3}}`, "self.all(k, size(k) < 4)"},
+		{`{"$defs": {"a/b c": {"type": "array"}}, "properties": {"x": {"$ref": "#/$defs/a~1b%20c"}}}`, "self.x.all(v, v + 1 > 2.0)"},
+		{`{"properties": {"m": {"additionalProperties": {"$id": "inner", "$ref": "#/x"}}}}`, "self.m.a.exists(v, v == meta.key)"},
+		{`{"items": [{"type": "string"}], "prefixItems": [true]}`, "self.filter(v, v != null).map(v, v).size() > 0"},
+		{`true`, "meta.bytes * 1.5 > baseline.x"},
+	} {
+		f.Add(seed[0], seed[1])
+	}
+	f.Fuzz(func(t *testing.T, schema, expr string) {
+		src := "apiVersion: 0cular/v1alpha1\nkind: Contract\nmetadata: {name: fuzz}\nartifact: {format: json, maxBytes: 64KiB}\n" +
+			"schema: {jsonSchema: fuzz.schema.json}\ninvariants:\n  - name: rule\n    expr: " + strconv.Quote(expr) + "\n"
+		c, err := contract.Parse([]byte(src))
+		if err != nil {
+			return // The expression doesn't fit in a YAML string.
+		}
+		c.Schema.Data = []byte(schema)
+		findings, err := Lint(c)
+		if err != nil {
+			t.Fatalf("Lint() error = %v", err)
+		}
+		for _, f := range findings {
+			if (f.Severity != SeverityError && f.Severity != SeverityWarning) || f.Path == "" || f.Message == "" {
+				t.Fatalf("finding %+v lacks a severity, a field or a message", f)
+			}
+		}
+	})
 }
 
 // checkValue checks that v holds only the types Decode produces, with

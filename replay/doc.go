@@ -12,7 +12,10 @@
 //	consumer/       a stub that exits 0 on the baseline and fails on the candidate
 //	expected.yaml   the expected outcome at each stage, under expected.schema.json
 //
-// The package's tests prove each stub's behavior and check every scenario's
-// files. The data is synthetic, and 0cular isn't affiliated with the
-// companies whose postmortems the scenarios follow.
+// Scenarios returns the scenarios built into 0cular, without their stubs,
+// and Scenario.Check runs one through the gate; 0cular replay run uses them.
+// The package's tests prove each stub's behavior, check every scenario's
+// files, and check the gate's verdict on each. The data is synthetic, and
+// 0cular isn't affiliated with the companies whose postmortems the
+// scenarios follow.
 package replay

@@ -2,7 +2,7 @@
 
 0cular gives config and data changes the safety net that code already has: it checks a change before it's published, keeps the last known good copy when a service loads it, and rolls changes out in rings with automatic revert. This page explains how the parts fit together. The [build plan](BUILD_PLAN.md) has the full design and the schedule, and the [ADRs](adr/README.md) record the decisions.
 
-> **Status: pre-alpha.** This describes the design. Today the repository has the CLI skeleton and the [replay suite](../replay/); the gate arrives in v0.1, the loader in v0.2, publishing in v0.3 and rings in v0.4.
+> **Status: pre-alpha.** This describes the design. Today the repository has the gate's checks, approvals and reports, the `check`, `diff`, `contract lint` and `replay run` commands, and the [replay suite](../replay/). The rest of v0.1 (the GitHub Action) comes next, then the loader in v0.2, publishing in v0.3 and rings in v0.4.
 
 ## Overview
 
@@ -46,7 +46,7 @@ A candidate goes through the same steps everywhere the gate runs:
 4. **Diff budgets:** how far a measure may move from the baseline, such as "the feature count changes by at most 20%".
 5. **Consumer tests (v0.3):** the real consumer, run on the candidate in a sandbox.
 
-A failure in any step is a BLOCK, except a breached budget, which needs an approval (NEEDS_APPROVAL) unless the budget says it can't be overridden. An approval binds to the candidate's digest, the contract and the breached budgets, so it can't be reused for anything else. The exit codes are 0 for PASS, 1 for BLOCK and 3 for NEEDS_APPROVAL.
+A failure in any step is a BLOCK, except a breached budget, which needs an approval (NEEDS_APPROVAL) unless the budget says it can't be overridden. An approval binds to the candidate's digest, the contract and the breached budgets' values, so it can't be reused for anything else, and it expires ([ADR-0016](adr/0016-approvals.md)). The exit codes are 0 for PASS, 1 for BLOCK and 3 for NEEDS_APPROVAL.
 
 ## Versions, the pointer and stores
 
@@ -157,7 +157,7 @@ flowchart TD
 
 | Metric | Type | Labels |
 | --- | --- | --- |
-| `zerocular_config_info` | gauge (=1) | artifact, config_version, ring, instance_id |
+| `zerocular_config_info` | gauge (=1) | artifact, config_version, ring, instance_id, region, zone, cell |
 | `zerocular_loads_total` | counter | artifact, result |
 | `zerocular_check_failures_total` | counter | artifact, check |
 | `zerocular_stale` | gauge (0 or 1) | artifact |
@@ -170,7 +170,7 @@ Application metrics don't need a version label: a PromQL join on `zerocular_conf
 ## Security boundaries
 
 - **Least privilege.** Publishers can write blobs and the pointer, loaders only read through `Source`, and the promoter can write only the pointer.
-- **Untrusted artifacts.** Artifacts are size-capped and strictly decoded, nothing in them is executed, and every report escapes their contents.
+- **Untrusted artifacts.** Artifacts are size-capped and strictly decoded, nothing in them is executed, and every report escapes their contents and hides the values of fields that hold secrets (ADR-0015).
 - **Integrity.** The loader verifies the SHA-256 of every version it loads.
 - **Contracts are code.** They're reviewed and owned. Consumer-test commands come only from contracts, never from artifacts.
 
@@ -180,9 +180,10 @@ See [SECURITY.md](../SECURITY.md) to report a vulnerability.
 
 ```text
 cmd/0cular/   the CLI
-contract/     contract types, strict loading, lint (v0.1)
-eval/         decoding, schema, CEL invariants, budgets (v0.1)
+contract/     contract types and strict loading (v0.1)
+eval/         decoding, schema, CEL invariants, budgets and lint (v0.1)
 gate/         the check API and approvals (v0.1)
+diff/         measure deltas and a JSON Patch summary between two versions (v0.1)
 report/       text, Markdown and JSON reports (v0.1)
 action/       the GitHub Action (v0.1)
 loader/       the loader library (v0.2)

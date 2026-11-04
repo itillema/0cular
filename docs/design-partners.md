@@ -13,7 +13,7 @@ You publish something that services pick up at runtime without a deploy, for exa
 - feature files, model files or thresholds;
 - prompts, model IDs, agent tool manifests or guardrail rules.
 
-And a bad version of it could take something down: a list grows past a limit nobody wrote down, a field arrives blank, a record ends up empty. Five of the largest outages since mid-2024 started that way, and the [replay suite](../replay/) reconstructs their failure shapes from the public postmortems, with synthetic data.
+And a bad version of it could take something down: a list grows past a limit nobody wrote down, a field arrives blank, a record ends up empty. Several of the largest outages since mid-2024 started that way, and the [replay suite](../replay/) reconstructs their failure shapes from the public postmortems, with synthetic data.
 
 ## What you'd get
 

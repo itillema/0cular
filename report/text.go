@@ -1,0 +1,164 @@
+package report
+
+import (
+	"fmt"
+	"io"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/itillema/0cular/eval"
+)
+
+// How many characters each kind of field may show. Evidence and messages
+// are already short, since eval cuts the values it quotes; these bound the
+// rest, such as a file path.
+const (
+	maxNameRunes   = 100
+	maxKeyRunes    = 200
+	maxDetailRunes = 1000
+	// maxNameColumn is the widest the name column grows; a longer name
+	// pushes its line's evidence along.
+	maxNameColumn = 40
+)
+
+// writeText writes r for a terminal:
+//
+//	0cular check  bot-features  candidate config/bot-features.json sha256:bb12cd34ef56…  no baseline
+//	BLOCK
+//	  ✗ invariant  feature-cap  size(self.features) = 240, not <= 200 — the proxy preallocates 200 features
+//	  ✓ schema     bot-features.schema.json
+//
+// Approvals take a line each, below the verdict. Every string from the
+// result is shown with visible escapes, so each check takes one line, and
+// schema violations one line each below it.
+func writeText(w io.Writer, r *eval.Result) error {
+	var b strings.Builder
+	b.WriteString("0cular check  " + textField(r.Contract, maxNameRunes))
+	b.WriteString("  candidate " + textArtifact(r.Candidate))
+	if r.Baseline != nil {
+		b.WriteString("  baseline " + textArtifact(*r.Baseline))
+	} else {
+		b.WriteString("  no baseline")
+	}
+	b.WriteString("\n" + string(r.Verdict) + "\n")
+	writeTextApprovals(&b, r.Approvals)
+	writeTextChecks(&b, r.Checks)
+	_, err := io.WriteString(w, b.String())
+	return err
+}
+
+// writeTextApprovals writes a line for each approval: who approved, until
+// when and why, or why the approval doesn't apply.
+//
+//	Approved by alice until 2026-11-05T12:00:00Z: the feature list doubles on purpose
+//	An approval by bob doesn't apply: it's for another candidate
+func writeTextApprovals(b *strings.Builder, approvals []eval.ApprovalOutcome) {
+	for _, a := range approvals {
+		if a.Applied {
+			fmt.Fprintf(b, "Approved by %s until %s: %s\n", textField(a.By, maxNameRunes), expiry(a.Expires), textField(a.Reason, maxDetailRunes))
+			continue
+		}
+		b.WriteString("An approval")
+		if hasApprover(a) {
+			b.WriteString(" by " + textField(a.By, maxNameRunes))
+		}
+		b.WriteString(" doesn't apply: " + textField(a.Rejection, maxDetailRunes) + "\n")
+	}
+}
+
+// writeTextChecks writes a line for each check, those that need attention
+// first, with a line for each schema violation below its check.
+func writeTextChecks(b *strings.Builder, checks []eval.Check) {
+	checks = byAttention(checks)
+	width := 0
+	for _, c := range checks {
+		width = max(width, min(utf8.RuneCountInString(textField(c.Name, maxNameRunes)), maxNameColumn))
+	}
+	for _, c := range checks {
+		name := textField(c.Name, maxNameRunes)
+		fmt.Fprintf(b, "  %s %-9s  %s", textSymbol(c.Status), c.Kind, name)
+		if detail := textDetail(c); detail != "" {
+			b.WriteString(pad(name, width) + "  " + detail)
+		}
+		b.WriteString("\n")
+		for _, v := range c.Violations {
+			b.WriteString("      " + textField(describeViolation(v), maxDetailRunes) + "\n")
+		}
+		if more := c.ViolationCount - len(c.Violations); more > 0 {
+			fmt.Fprintf(b, "      and %d more\n", more)
+		}
+	}
+}
+
+// pad returns the spaces that line s up with a column width characters
+// wide.
+func pad(s string, width int) string {
+	return strings.Repeat(" ", max(width-utf8.RuneCountInString(s), 0))
+}
+
+// textField shows untrusted text on one line, cut to n characters.
+func textField(s string, n int) string {
+	return visible(cut(s, n))
+}
+
+// textArtifact identifies a version: its key, if it has one, and digest.
+func textArtifact(a eval.Artifact) string {
+	digest := visible(shortDigest(a.Digest))
+	if a.Key == "" {
+		return digest
+	}
+	return textField(a.Key, maxKeyRunes) + " " + digest
+}
+
+// textDetail is what a check's line shows after its name: the evidence;
+// the contract's message, unless the check passed; and a note on any
+// status but pass and fail.
+func textDetail(c eval.Check) string {
+	var parts []string
+	if c.Evidence != "" {
+		parts = append(parts, textField(c.Evidence, maxDetailRunes))
+	}
+	if c.Message != "" && c.Status != eval.StatusPass {
+		parts = append(parts, "— "+textField(c.Message, maxDetailRunes))
+	}
+	if note := statusNote(c.Status); note != "" {
+		parts = append(parts, "("+note+")")
+	}
+	return strings.Join(parts, " ")
+}
+
+// textSymbol marks a check's status at the start of its line.
+func textSymbol(s eval.Status) string {
+	switch s {
+	case eval.StatusPass:
+		return "✓"
+	case eval.StatusNeedsApproval, eval.StatusApproved:
+		return "!"
+	case eval.StatusSkipped:
+		return "-"
+	}
+	return "✗"
+}
+
+// statusNote names the statuses that a check's symbol doesn't make plain.
+func statusNote(s eval.Status) string {
+	switch s {
+	case eval.StatusError:
+		return "error"
+	case eval.StatusNeedsApproval:
+		return "needs approval"
+	case eval.StatusApproved:
+		return "approved"
+	case eval.StatusSkipped:
+		return "skipped"
+	}
+	return ""
+}
+
+// describeViolation says where a schema violation is and what it is.
+func describeViolation(v eval.Violation) string {
+	if v.Pointer == "" {
+		return "at the top level: " + v.Message
+	}
+	return "at " + v.Pointer + ": " + v.Message
+}

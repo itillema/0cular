@@ -1,0 +1,9 @@
+### 0cular diff: ❌ not compared
+
+Contract quota\-policies · baseline policies\.yaml (sha256:0be200000000…) · candidate policies\.yaml (sha256:c52100000000…)
+
+| | Kind | Check | Evidence |
+| --- | --- | --- | --- |
+| ❌ | envelope | candidate | line 1, column 11: invalid YAML: did not find expected node content |
+| ⏭️ | budget | policy\-count\-stable | the candidate didn't decode \(skipped\) |
+| ✅ | envelope | baseline | 677 B ≤ 1 MiB; valid YAML |
