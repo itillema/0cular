@@ -11,6 +11,7 @@
     "digest": "sha256:dd56000000000000000000000000000000000000000000000000000000000000"
   },
   "baseline": null,
+  "approvals": [],
   "checks": [
     {
       "kind": "envelope",

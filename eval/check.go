@@ -60,6 +60,9 @@ const (
 	// StatusNeedsApproval means a diff budget was breached, and an
 	// approval can accept it.
 	StatusNeedsApproval Status = "needs-approval"
+	// StatusApproved means a diff budget was breached, and an approval
+	// accepted it. gate.Check sets it; Evaluator.Check never does.
+	StatusApproved Status = "approved"
 	// StatusSkipped means the check didn't run, such as when the candidate
 	// didn't decode.
 	StatusSkipped Status = "skipped"
@@ -126,6 +129,10 @@ type Result struct {
 	// Checks holds every check, ordered by step and then as the contract
 	// lists them.
 	Checks []Check
+	// Approvals lists the approvals given for the candidate, in the order
+	// they were given, and whether each applied. gate.Check fills it;
+	// Evaluator.Check leaves it empty.
+	Approvals []ApprovalOutcome
 }
 
 // Input is one version of an artifact to check.

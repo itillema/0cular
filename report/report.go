@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
+	"time"
 
 	"github.com/itillema/0cular/diff"
 	"github.com/itillema/0cular/eval"
@@ -15,13 +17,14 @@ type Format string
 
 // The formats Write and WriteDiff render.
 const (
-	// Text is for terminals: a check's verdict, or a diff's versions, then
-	// a line for each check, with the checks that need attention first, and
-	// a line for each change a diff lists.
+	// Text is for terminals: a check's verdict and approvals, or a diff's
+	// versions, then a line for each check, with the checks that need
+	// attention first, and a line for each change a diff lists.
 	Text Format = "text"
 	// Markdown is for GitHub Job Summaries and pull request comments: the
-	// verdict, or a diff's number of changes, then a table of the checks,
-	// attention first, and a table of the changes a diff lists.
+	// verdict and a list of approvals, or a diff's number of changes, then a
+	// table of the checks, attention first, and a table of the changes a
+	// diff lists.
 	Markdown Format = "md"
 	// JSON is for programs: every field of the result, in step order. Its
 	// schemaVersion is 1.
@@ -87,14 +90,14 @@ func unknownFormat(name string) error {
 }
 
 // byAttention orders checks for a reader: those that block first, then
-// those that need approval, then the skipped ones, then those that passed,
-// in step order within each.
+// those that need approval or were approved, then the skipped ones, then
+// those that passed, in step order within each.
 func byAttention(checks []eval.Check) []eval.Check {
 	rank := func(s eval.Status) int {
 		switch s {
 		case eval.StatusFail, eval.StatusError:
 			return 0
-		case eval.StatusNeedsApproval:
+		case eval.StatusNeedsApproval, eval.StatusApproved:
 			return 1
 		case eval.StatusSkipped:
 			return 2
@@ -109,4 +112,14 @@ func byAttention(checks []eval.Check) []eval.Check {
 // shortDigest shortens a "sha256:" digest to its first 12 hex digits.
 func shortDigest(digest string) string {
 	return cut(digest, len("sha256:")+13)
+}
+
+// expiry formats when an approval expires, in UTC.
+func expiry(t time.Time) string {
+	return t.UTC().Format(time.RFC3339)
+}
+
+// hasApprover reports whether an approval names who approved.
+func hasApprover(a eval.ApprovalOutcome) bool {
+	return strings.TrimSpace(a.By) != ""
 }

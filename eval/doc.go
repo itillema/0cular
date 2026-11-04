@@ -17,6 +17,8 @@
 // evidence it found, and a verdict: BLOCK if any check fails or can't run,
 // NEEDS_APPROVAL if a budget that an approval can accept is breached, and
 // PASS otherwise. A candidate that fails is a result, not an error.
+// Package gate applies approvals to a Result, which records each Approval
+// and whether it applied.
 //
 // Lint checks a contract more thoroughly than New does, for contract lint:
 // it also finds rules that could exceed their cost limit on some artifact

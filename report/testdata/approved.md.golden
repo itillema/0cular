@@ -1,0 +1,13 @@
+### 0cular check: ✅ PASS
+
+Contract bot\-features · candidate config/bot\-features\.json (sha256:bb12cd34ef56…) · baseline config/bot\-features\.json (sha256:aa3400000000…)
+
+- An approval by bob doesn't apply: it's for another candidate
+- Approved by alice until 2026-11-05T12:00:00Z: the feature list doubles on purpose
+
+| | Kind | Check | Evidence |
+| --- | --- | --- | --- |
+| ⚠️ | budget | feature\-count\-stable | 120 → 240 \(\+100%\); budget ±20% \(approved\) |
+| ✅ | envelope | candidate | 1\.8 KiB ≤ 5 MiB; valid JSON |
+| ✅ | envelope | baseline | 921 B ≤ 5 MiB; valid JSON |
+| ✅ | invariant | feature\-cap |  |

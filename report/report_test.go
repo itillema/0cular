@@ -105,8 +105,43 @@ func passResult() *eval.Result {
 	}
 }
 
+// approvedResult is a result whose breached budget an approval accepted,
+// after another approval didn't apply.
+func approvedResult() *eval.Result {
+	approval := eval.Approval{
+		By: "alice", Reason: "the feature list doubles on purpose", Expires: time.Date(2026, 11, 5, 13, 0, 0, 0, time.FixedZone("CET", 3600)),
+		CandidateDigest: "sha256:bb12cd34ef56000000000000000000000000000000000000000000000000000",
+		ContractDigest:  "sha256:c0ffee0000000000000000000000000000000000000000000000000000000000",
+		Budgets:         []eval.ApprovedBudget{{Name: "feature-count-stable", Baseline: 120, Candidate: 240}},
+	}
+	stale := approval
+	stale.By, stale.Reason = "bob", "an earlier draft"
+	stale.CandidateDigest = "sha256:ab00000000000000000000000000000000000000000000000000000000000000"
+	return &eval.Result{
+		Verdict:        eval.Pass,
+		Contract:       "bot-features",
+		ContractDigest: approval.ContractDigest,
+		Candidate:      eval.Artifact{Key: "config/bot-features.json", Size: 1843, Digest: approval.CandidateDigest},
+		Baseline:       &eval.Artifact{Key: "config/bot-features.json", Size: 921, Digest: "sha256:aa34000000000000000000000000000000000000000000000000000000000000"},
+		Checks: []eval.Check{
+			{Kind: eval.KindEnvelope, Name: "candidate", Status: eval.StatusPass, Evidence: "1.8 KiB ≤ 5 MiB; valid JSON"},
+			{Kind: eval.KindEnvelope, Name: "baseline", Status: eval.StatusPass, Evidence: "921 B ≤ 5 MiB; valid JSON"},
+			{Kind: eval.KindInvariant, Name: "feature-cap", Status: eval.StatusPass, Message: "the proxy preallocates 200 features", Cost: 3},
+			{
+				Kind: eval.KindBudget, Name: "feature-count-stable", Status: eval.StatusApproved, Evidence: "120 → 240 (+100%); budget ±20%",
+				Budget: &eval.BudgetValues{Baseline: 120, Candidate: 240, Breached: []string{"maxChangePct"}}, Cost: 4,
+			},
+		},
+		Approvals: []eval.ApprovalOutcome{
+			{Approval: stale, Rejection: "it's for another candidate"},
+			{Approval: approval, Applied: true},
+		},
+	}
+}
+
 // resultWith returns a result with s in every string field a report shows.
 func resultWith(s string) *eval.Result {
+	approval := eval.Approval{By: s, Reason: s, Expires: time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC), Budgets: []eval.ApprovedBudget{{Name: s}}}
 	return &eval.Result{
 		Verdict:        eval.Block,
 		Contract:       s,
@@ -123,6 +158,10 @@ func resultWith(s string) *eval.Result {
 			{Kind: eval.KindBudget, Name: s, Status: eval.StatusNeedsApproval, Message: s, Evidence: s, Budget: &eval.BudgetValues{Breached: []string{s}}},
 			{Kind: eval.KindInvariant, Name: s, Status: eval.StatusPass, Message: s, Evidence: s},
 		},
+		Approvals: []eval.ApprovalOutcome{
+			{Approval: approval, Applied: true},
+			{Approval: approval, Rejection: s},
+		},
 	}
 }
 
@@ -136,6 +175,14 @@ func hostileResult() *eval.Result {
 		c.Name, c.Message, c.Evidence = h(3*i+3), h(3*i+4), h(3*i+5)
 	}
 	r.Checks[0].Violations = []eval.Violation{{Pointer: h(4), Message: h(5)}, {Pointer: h(6), Message: h(7)}, {Pointer: h(8), Message: h(9)}}
+	for i := range r.Approvals {
+		a := &r.Approvals[i]
+		a.By, a.Reason = h(4*i+6), h(4*i+7)
+		a.Budgets = []eval.ApprovedBudget{{Name: h(4 * i)}}
+		if !a.Applied {
+			a.Rejection = h(4*i + 5)
+		}
+	}
 	return r
 }
 
@@ -153,6 +200,7 @@ func TestGolden(t *testing.T) {
 	}{
 		{"block", blockResult()},
 		{"pass", passResult()},
+		{"approved", approvedResult()},
 		{"hostile", hostileResult()},
 	} {
 		for _, f := range Formats() {
@@ -231,10 +279,11 @@ func checkEscaping(t tester, s string) {
 		return b.String()
 	}
 
-	// Text: each check takes one line, and violations one line each.
+	// Text: each approval and each check takes one line, and violations one
+	// line each.
 	text := render(Text)
 	lines := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
-	if want := 2 + len(r.Checks) + 2 + 1; len(lines) != want {
+	if want := 2 + len(r.Approvals) + len(r.Checks) + 2 + 1; len(lines) != want {
 		t.Fatalf("text has %d lines, want %d, for %q:\n%s", len(lines), want, s, text)
 	}
 	for _, line := range lines {
@@ -282,6 +331,9 @@ func checkEscaping(t tester, s string) {
 	want := replaceInvalid(s)
 	if got.Contract.Name != want || got.Candidate.Key != want || got.Checks[0].Violations[0].Pointer != want || got.Checks[1].Evidence != want || got.Checks[2].Budget.Breached[0] != want {
 		t.Fatalf("JSON changed %q into %+v", s, got)
+	}
+	if a := got.Approvals; len(a) != 2 || a[0].By != want || a[0].Reason != want || a[0].Budgets[0] != want || a[1].Rejection != want {
+		t.Fatalf("JSON changed %q into approvals %+v", s, a)
 	}
 }
 

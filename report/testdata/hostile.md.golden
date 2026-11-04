@@ -2,6 +2,9 @@
 
 Contract \<script\>alert\(1\)\</script\> \<img src=x onerror=alert\(1\)\> · candidate \`code\` and \`\`\` fences \`\`\` and \~\~\~ (sha256:\<script\>aler…) · baseline a \| b \|\| c \\\| d (sha256:\<script\>aler…)
 
+- Approved by \\u202eevil\\u202c, \\u2066isolate\\u2069, zero\\u200bwidth, tag \\U000e0041 until 2026-11-05T12:00:00Z: \*\*bold\*\* \_em\_ \[link\]\(https://example\.com\) \!\[img\]\(https://example\.com/x\.png\) \# heading \> quote \- item \$math\$ \~\~strike\~\~ \&lt;entity\&gt; \&\#&#8203;64;
+- An approval by ✓ 中文 👍 ok doesn't apply: long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long long…
+
 | | Kind | Check | Evidence |
 | --- | --- | --- | --- |
 | ❌ | schema | @&#8203;octocat, @&#8203;org/team, \#&#8203;123, owner/repo\#&#8203;45 and someone@&#8203;example\.com | \\x1b\[31mred\\x1b\[0m, NUL \\x00, DEL \\x7f, NEL \\u0085 and LS \\u2028 — line one\\nline two\\r\\n\\ttabbed |

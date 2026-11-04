@@ -17,9 +17,10 @@ const (
 )
 
 // writeMarkdown writes r for a GitHub Job Summary or pull request comment:
-// a heading with the verdict, the versions checked, a table of the checks
-// with those that need attention first, and a list of schema violations.
-// Every string from the result goes through markdownText.
+// a heading with the verdict, the versions checked, a list of approvals, a
+// table of the checks with those that need attention first, and a list of
+// schema violations. Every string from the result goes through
+// markdownText.
 func writeMarkdown(w io.Writer, r *eval.Result) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "### 0cular check: %s %s\n\n", verdictEmoji(r.Verdict), r.Verdict)
@@ -31,9 +32,30 @@ func writeMarkdown(w io.Writer, r *eval.Result) error {
 		b.WriteString(" · no baseline")
 	}
 	b.WriteString("\n\n")
+	writeMarkdownApprovals(&b, r.Approvals)
 	writeMarkdownChecks(&b, r.Checks)
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// writeMarkdownApprovals writes a list item for each approval: who
+// approved, until when and why, or why the approval doesn't apply.
+func writeMarkdownApprovals(b *strings.Builder, approvals []eval.ApprovalOutcome) {
+	if len(approvals) == 0 {
+		return
+	}
+	for _, a := range approvals {
+		if a.Applied {
+			fmt.Fprintf(b, "- Approved by %s until %s: %s\n", markdownText(a.By, maxMarkdownName), expiry(a.Expires), markdownText(a.Reason, maxMarkdownDetail))
+			continue
+		}
+		b.WriteString("- An approval")
+		if hasApprover(a) {
+			b.WriteString(" by " + markdownText(a.By, maxMarkdownName))
+		}
+		b.WriteString(" doesn't apply: " + markdownText(a.Rejection, maxMarkdownDetail) + "\n")
+	}
+	b.WriteString("\n")
 }
 
 // writeMarkdownChecks writes a table of the checks, those that need
@@ -100,7 +122,7 @@ func statusEmoji(s eval.Status) string {
 	switch s {
 	case eval.StatusPass:
 		return "✅"
-	case eval.StatusNeedsApproval:
+	case eval.StatusNeedsApproval, eval.StatusApproved:
 		return "⚠️"
 	case eval.StatusSkipped:
 		return "⏭️"

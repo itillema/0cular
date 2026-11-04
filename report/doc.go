@@ -1,8 +1,14 @@
 // Package report renders a check's eval.Result, or a diff's diff.Result, as
 // text, Markdown or JSON.
 //
+// A check's report shows the approvals given for the candidate, if any:
+// who approved, until when and why, or why an approval doesn't apply. It
+// names the budgets an approval covers, but not their values, which the
+// checks show, redacted where they must be.
+//
 // Every string in a result can come from untrusted input: an artifact's
-// keys and values, a contract's messages, file paths. So each format
+// keys and values, a contract's messages, file paths, an approval's
+// approver and reason. So each format
 // escapes them, as the build plan's security model (§3.12) requires:
 //   - Text replaces control characters, and the Unicode characters that
 //     reorder or hide text, with visible escapes: \n for a line break, and a

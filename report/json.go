@@ -18,12 +18,27 @@ import (
 // step, then as the contract lists them.
 type (
 	jsonReport struct {
-		SchemaVersion int           `json:"schemaVersion"`
-		Verdict       eval.Verdict  `json:"verdict"`
-		Contract      jsonContract  `json:"contract"`
-		Candidate     jsonArtifact  `json:"candidate"`
-		Baseline      *jsonArtifact `json:"baseline"`
-		Checks        []jsonCheck   `json:"checks"`
+		SchemaVersion int            `json:"schemaVersion"`
+		Verdict       eval.Verdict   `json:"verdict"`
+		Contract      jsonContract   `json:"contract"`
+		Candidate     jsonArtifact   `json:"candidate"`
+		Baseline      *jsonArtifact  `json:"baseline"`
+		Approvals     []jsonApproval `json:"approvals"`
+		Checks        []jsonCheck    `json:"checks"`
+	}
+	// jsonApproval is an approval and whether it applied. It names the
+	// budgets it covers, but not their values, which the checks show,
+	// redacted where they must be (ADR-0015). Expires is null for an
+	// approval without an expiry, which never applies.
+	jsonApproval struct {
+		By              string     `json:"by"`
+		Reason          string     `json:"reason"`
+		Expires         *time.Time `json:"expires"`
+		CandidateDigest string     `json:"candidateDigest"`
+		ContractDigest  string     `json:"contractDigest"`
+		Budgets         []string   `json:"budgets"`
+		Applied         bool       `json:"applied"`
+		Rejection       string     `json:"rejection"`
 	}
 	jsonContract struct {
 		Name   string `json:"name"`
@@ -85,11 +100,36 @@ func toJSON(r *eval.Result) jsonReport {
 		Verdict:       r.Verdict,
 		Contract:      jsonContract{Name: r.Contract, Digest: r.ContractDigest},
 		Candidate:     jsonArtifact(r.Candidate),
+		Approvals:     toJSONApprovals(r.Approvals),
 		Checks:        toJSONChecks(r.Checks),
 	}
 	if r.Baseline != nil {
 		b := jsonArtifact(*r.Baseline)
 		out.Baseline = &b
+	}
+	return out
+}
+
+func toJSONApprovals(approvals []eval.ApprovalOutcome) []jsonApproval {
+	out := make([]jsonApproval, 0, len(approvals))
+	for _, a := range approvals {
+		ja := jsonApproval{
+			By:              a.By,
+			Reason:          a.Reason,
+			CandidateDigest: a.CandidateDigest,
+			ContractDigest:  a.ContractDigest,
+			Budgets:         make([]string, 0, len(a.Budgets)),
+			Applied:         a.Applied,
+			Rejection:       a.Rejection,
+		}
+		if !a.Expires.IsZero() {
+			expires := a.Expires.UTC()
+			ja.Expires = &expires
+		}
+		for _, b := range a.Budgets {
+			ja.Budgets = append(ja.Budgets, b.Name)
+		}
+		out = append(out, ja)
 	}
 	return out
 }

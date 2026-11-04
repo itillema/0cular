@@ -130,6 +130,12 @@ func TestBinaryCheck(t *testing.T) {
 			t.Errorf("0cular check on %s exited with %d, want %d; output:\n%s", candidate, code, wantCode, out)
 		}
 	}
+	code, out := runBinary(t, "check", "--contract", filepath.Join(dir, "contract.yaml"),
+		"--candidate", filepath.Join(dir, "over-budget.json"), "--baseline", filepath.Join(dir, "baseline.json"),
+		"--approve", "--approver", "alice", "--reason", "the limit doubles on purpose")
+	if code != exitPass {
+		t.Errorf("0cular check --approve on over-budget.json exited with %d, want %d; output:\n%s", code, exitPass, out)
+	}
 }
 
 func TestBinaryDiff(t *testing.T) {

@@ -2,7 +2,7 @@
 
 0cular gives config and data changes the safety net that code already has: it checks a change before it's published, keeps the last known good copy when a service loads it, and rolls changes out in rings with automatic revert. This page explains how the parts fit together. The [build plan](BUILD_PLAN.md) has the full design and the schedule, and the [ADRs](adr/README.md) record the decisions.
 
-> **Status: pre-alpha.** This describes the design. Today the repository has the gate's checks and reports, the `check`, `diff`, `contract lint` and `replay run` commands, and the [replay suite](../replay/). The rest of v0.1 (approvals and the GitHub Action) comes next, then the loader in v0.2, publishing in v0.3 and rings in v0.4.
+> **Status: pre-alpha.** This describes the design. Today the repository has the gate's checks, approvals and reports, the `check`, `diff`, `contract lint` and `replay run` commands, and the [replay suite](../replay/). The rest of v0.1 (the GitHub Action) comes next, then the loader in v0.2, publishing in v0.3 and rings in v0.4.
 
 ## Overview
 
@@ -46,7 +46,7 @@ A candidate goes through the same steps everywhere the gate runs:
 4. **Diff budgets:** how far a measure may move from the baseline, such as "the feature count changes by at most 20%".
 5. **Consumer tests (v0.3):** the real consumer, run on the candidate in a sandbox.
 
-A failure in any step is a BLOCK, except a breached budget, which needs an approval (NEEDS_APPROVAL) unless the budget says it can't be overridden. An approval binds to the candidate's digest, the contract and the breached budgets, so it can't be reused for anything else. The exit codes are 0 for PASS, 1 for BLOCK and 3 for NEEDS_APPROVAL.
+A failure in any step is a BLOCK, except a breached budget, which needs an approval (NEEDS_APPROVAL) unless the budget says it can't be overridden. An approval binds to the candidate's digest, the contract and the breached budgets' values, so it can't be reused for anything else, and it expires ([ADR-0016](adr/0016-approvals.md)). The exit codes are 0 for PASS, 1 for BLOCK and 3 for NEEDS_APPROVAL.
 
 ## Versions, the pointer and stores
 

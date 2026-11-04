@@ -28,8 +28,9 @@ const (
 //	  ✗ invariant  feature-cap  size(self.features) = 240, not <= 200 — the proxy preallocates 200 features
 //	  ✓ schema     bot-features.schema.json
 //
-// Every string from the result is shown with visible escapes, so each
-// check takes one line, and schema violations one line each below it.
+// Approvals take a line each, below the verdict. Every string from the
+// result is shown with visible escapes, so each check takes one line, and
+// schema violations one line each below it.
 func writeText(w io.Writer, r *eval.Result) error {
 	var b strings.Builder
 	b.WriteString("0cular check  " + textField(r.Contract, maxNameRunes))
@@ -40,9 +41,29 @@ func writeText(w io.Writer, r *eval.Result) error {
 		b.WriteString("  no baseline")
 	}
 	b.WriteString("\n" + string(r.Verdict) + "\n")
+	writeTextApprovals(&b, r.Approvals)
 	writeTextChecks(&b, r.Checks)
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// writeTextApprovals writes a line for each approval: who approved, until
+// when and why, or why the approval doesn't apply.
+//
+//	Approved by alice until 2026-11-05T12:00:00Z: the feature list doubles on purpose
+//	An approval by bob doesn't apply: it's for another candidate
+func writeTextApprovals(b *strings.Builder, approvals []eval.ApprovalOutcome) {
+	for _, a := range approvals {
+		if a.Applied {
+			fmt.Fprintf(b, "Approved by %s until %s: %s\n", textField(a.By, maxNameRunes), expiry(a.Expires), textField(a.Reason, maxDetailRunes))
+			continue
+		}
+		b.WriteString("An approval")
+		if hasApprover(a) {
+			b.WriteString(" by " + textField(a.By, maxNameRunes))
+		}
+		b.WriteString(" doesn't apply: " + textField(a.Rejection, maxDetailRunes) + "\n")
+	}
 }
 
 // writeTextChecks writes a line for each check, those that need attention
@@ -111,7 +132,7 @@ func textSymbol(s eval.Status) string {
 	switch s {
 	case eval.StatusPass:
 		return "✓"
-	case eval.StatusNeedsApproval:
+	case eval.StatusNeedsApproval, eval.StatusApproved:
 		return "!"
 	case eval.StatusSkipped:
 		return "-"
@@ -126,6 +147,8 @@ func statusNote(s eval.Status) string {
 		return "error"
 	case eval.StatusNeedsApproval:
 		return "needs approval"
+	case eval.StatusApproved:
+		return "approved"
 	case eval.StatusSkipped:
 		return "skipped"
 	}
